@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { supabase } from '@/lib/supabase-client';
+import { getAuthenticatedUser } from '@/lib/auth-helper';
 import { calcularNotaFinal } from '@/lib/motor-apuracao';
-import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +11,11 @@ export async function POST(request: NextRequest) {
     const { motorista_id, periodo_inicio, periodo_fim } = await request.json();
 
     // Verificar autenticação e permissão
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await getAuthenticatedUser(request);
     
     if (authError || !user) {
       return NextResponse.json(
-        { sucesso: false, erro: 'Não autenticado' },
+        { sucesso: false, erro: authError || 'Não autenticado' },
         { status: 401 }
       );
     }

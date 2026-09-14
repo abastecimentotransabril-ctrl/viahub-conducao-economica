@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase-client';
+import { fetchAutenticado } from '@/lib/fetch-autenticado';
 
 interface Motorista {
   id: string;
@@ -31,7 +32,7 @@ export default function Dashboard() {
         setUsuario(user);
 
         // Buscar motoristas
-        const response = await fetch('/api/motoristas');
+        const response = await fetchAutenticado('/api/motoristas');
         const json = await response.json();
 
         if (json.sucesso) {

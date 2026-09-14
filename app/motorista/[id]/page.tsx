@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
+import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { Motorista, Veiculo, ResultadoMotorista, LeituraTelemetria } from '@/lib/types';
 import { classificarPressao, corParaFaixa } from '@/lib/motor-apuracao';
 
@@ -33,7 +34,7 @@ export default function MotoristaDetalhe() {
           return;
         }
 
-        const response = await fetch(`/api/motoristas/${motorista_id}`);
+        const response = await fetchAutenticado(`/api/motoristas/${motorista_id}`);
         const json = await response.json();
 
         if (json.sucesso) {
