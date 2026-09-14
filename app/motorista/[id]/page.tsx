@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
@@ -27,6 +27,12 @@ interface ResultadoApi {
 
 interface LeituraComNota { leitura: LeituraApi; resultado: ResultadoApi | null }
 
+interface ResultadoPeriodo extends ResultadoApi {
+  qtdLeituras: number;
+  primeiraLeitura: string | null;
+  ultimaLeituraPeriodo: string | null;
+}
+
 interface DetalheData {
   motorista: { id: string; nome: string; cpf: string | null; matricula: string | null; ativo: boolean };
   veiculo: { placa: string; modelo_equipamento: string; capacidade: string } | null;
@@ -40,6 +46,8 @@ interface DetalheData {
   leiturasComNota: LeituraComNota[];
   ultimaLeitura: LeituraComNota | null;
   penultimaLeitura: LeituraComNota | null;
+  periodo: { inicio: string; fim: string };
+  resultadoPeriodo: ResultadoPeriodo | null;
   ranking: Array<{ placa: string; nome: string | null; nota: number | null; faixa: string | null }>;
   atendimentos: Array<{ id: string; resumo: string; resultado: string; indicador_mnemonico: string | null; criado_em: string }>;
   papelUsuario: string;
@@ -48,6 +56,7 @@ interface DetalheData {
 export default function MotoristaDetalhe() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const motoristaId = params.id as string;
 
   const [dados, setDados] = useState<DetalheData | null>(null);
@@ -65,16 +74,25 @@ export default function MotoristaDetalhe() {
   const [mdEnviando, setMdEnviando] = useState(false);
   const [mdErro, setMdErro] = useState<string | null>(null);
 
+  const hoje = new Date();
+  const trintaDiasAtras = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const [dataInicio, setDataInicio] = useState(searchParams.get('inicio') || trintaDiasAtras.toISOString().slice(0, 10));
+  const [dataFim, setDataFim] = useState(searchParams.get('fim') || hoje.toISOString().slice(0, 10));
+
   useEffect(() => {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [motoristaId]);
+  }, [motoristaId, dataInicio, dataFim]);
 
   async function carregar() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchAutenticado(`/api/motoristas/${motoristaId}/detalhe-completo`);
+      const inicioIso = new Date(dataInicio + 'T00:00:00').toISOString();
+      const fimIso = new Date(dataFim + 'T23:59:59').toISOString();
+      const response = await fetchAutenticado(
+        `/api/motoristas/${motoristaId}/detalhe-completo?inicio=${encodeURIComponent(inicioIso)}&fim=${encodeURIComponent(fimIso)}`
+      );
       const json = await response.json();
       if (json.sucesso) {
         setDados(json.dados);
@@ -138,11 +156,16 @@ export default function MotoristaDetalhe() {
     );
   }
 
-  const { motorista, veiculo, indicadores, faixasNota, faixasClassificacao, leiturasComNota, ultimaLeitura, penultimaLeitura, ranking, atendimentos } = dados;
+  const { motorista, veiculo, indicadores, faixasNota, faixasClassificacao, leiturasComNota, ultimaLeitura, penultimaLeitura, resultadoPeriodo, ranking, atendimentos } = dados;
 
-  const atual = ultimaLeitura?.resultado || null;
-  const anterior = penultimaLeitura?.resultado || null;
-  const delta = atual?.nota_final != null && anterior?.nota_final != null ? atual.nota_final - anterior.nota_final : null;
+  // Nota principal = cálculo acumulado do período selecionado (não mais só a última leitura)
+  const atual = resultadoPeriodo;
+  // Tendência recente = comparação das duas últimas leituras individuais (visão em tempo real, complementar)
+  const tendenciaAtual = ultimaLeitura?.resultado || null;
+  const tendenciaAnterior = penultimaLeitura?.resultado || null;
+  const deltaTendencia = tendenciaAtual?.nota_final != null && tendenciaAnterior?.nota_final != null
+    ? tendenciaAtual.nota_final - tendenciaAnterior.nota_final
+    : null;
 
   const pontuaIndicadores = indicadores.filter((i) => i.tipo === 'pontua').sort((a, b) => b.peso - a.peso);
   const classificaIndicador = indicadores.find((i) => i.tipo === 'classifica');
@@ -181,12 +204,12 @@ export default function MotoristaDetalhe() {
 
   let diagPior: { nome: string; contrib: number } | null = null;
   let diagMaior: { nome: string; gap: number } | null = null;
-  if (atual && anterior) {
-    const somaPeso = atual.detalhe.filter((x) => x.entrou).reduce((s, x) => s + x.peso, 0);
-    const comp = atual.detalhe
+  if (tendenciaAtual && tendenciaAnterior) {
+    const somaPeso = tendenciaAtual.detalhe.filter((x) => x.entrou).reduce((s, x) => s + x.peso, 0);
+    const comp = tendenciaAtual.detalhe
       .filter((d) => d.entrou)
       .map((d) => {
-        const dp = anterior.detalhe.find((x) => x.indicador === d.indicador);
+        const dp = tendenciaAnterior.detalhe.find((x) => x.indicador === d.indicador);
         const dv = d.valor != null && dp?.valor != null ? d.valor - dp.valor : null;
         const contrib = dv == null || somaPeso === 0 ? null : (d.peso * dv) / somaPeso;
         const gap = d.nota != null ? ((100 - d.nota) * d.peso) / 100 : 0;
@@ -216,8 +239,8 @@ export default function MotoristaDetalhe() {
           <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
         </div>
         <nav>
-          <Link href="/">Painel geral</Link>
-          <a href="#" className="on">Motoristas</a>
+          <Link href="/">Motoristas</Link>
+          <Link href="/painel">Visão Geral (Gamificação)</Link>
           <a href="#">Indicadores</a>
           <a href="#">Recálculo</a>
           <a href="#">Master Drive</a>
@@ -232,7 +255,12 @@ export default function MotoristaDetalhe() {
         <div className="topbar">
           <span className="trilha">‹ &nbsp;Motoristas &nbsp;›&nbsp; <b>{motorista.nome}</b></span>
           <span className="spacer"></span>
-          <span className="chip">📅 {dataUltimaLeitura ? dataUltimaLeitura.toLocaleDateString('pt-BR') : '—'} <span className="tag">{leiturasComNota.length} leitura(s) disponível(is)</span></span>
+          <span className="chip" style={{ gap: 8 }}>
+            📅
+            <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
+            –
+            <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
+          </span>
           <span className="chip">🏢 Transabril</span>
           <div className="role" role="group" aria-label="Visualizar como">
             <button aria-pressed={role === 'gestor'} onClick={() => setRole('gestor')}>Gestor</button>
@@ -259,7 +287,7 @@ export default function MotoristaDetalhe() {
                 <span>Transabril <span className="tag">unidade a nomear no cadastro</span></span>
               </div>
               <p className="hdr-note">
-                Configuração vigente: <b style={{ color: 'var(--ink)' }}>{dados.configVigente?.nome || 'nenhuma configuração ativa'}</b> · Base cobre {leiturasComNota.length} leitura(s) real(is) de telemetria.
+                Configuração vigente: <b style={{ color: 'var(--ink)' }}>{dados.configVigente?.nome || 'nenhuma configuração ativa'}</b> · Cálculo acumulado de {new Date(dataInicio).toLocaleDateString('pt-BR')} a {new Date(dataFim).toLocaleDateString('pt-BR')}, com {atual?.qtdLeituras ?? 0} leitura(s) real(is) de telemetria.
               </p>
             </div>
             <div className="hero-panel">
@@ -288,10 +316,12 @@ export default function MotoristaDetalhe() {
                 <div className="gauge-card">
                   <h3>NOTA DE CONDUÇÃO</h3>
                   <div className="gauge-delta">
-                    {delta !== null ? (
+                    {atual && atual.qtdLeituras > 0 ? (
+                      <span style={{ color: '#8b9490' }}>{atual.qtdLeituras} leitura(s) no período</span>
+                    ) : deltaTendencia !== null ? (
                       <>
-                        <span style={{ color: delta < 0 ? '#e08a7d' : '#7cc79a' }}>
-                          {delta < 0 ? '↓' : '↑'} {sinal(delta)}{nf(delta, 1)}
+                        <span style={{ color: deltaTendencia < 0 ? '#e08a7d' : '#7cc79a' }}>
+                          {deltaTendencia < 0 ? '↓' : '↑'} {sinal(deltaTendencia)}{nf(deltaTendencia, 1)}
                         </span>
                         &nbsp;<span style={{ color: '#6b716e' }}>vs. leitura de {horaPenultima}</span>
                       </>
@@ -350,7 +380,7 @@ export default function MotoristaDetalhe() {
                   <div className="rings">
                     {pontuaIndicadores.map((ind) => {
                       const da = atual?.detalhe.find((d) => d.indicador === ind.mnemonico);
-                      const dp = anterior?.detalhe.find((d) => d.indicador === ind.mnemonico);
+                      const dp = tendenciaAnterior?.detalhe.find((d) => d.indicador === ind.mnemonico);
                       if (!ind.campo_fonte) {
                         return (
                           <div className="ring-item ring-pend" key={ind.id}>

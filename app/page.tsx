@@ -68,8 +68,8 @@ export default function Dashboard() {
           <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
         </div>
         <nav>
-          <Link href="/" className="on">Painel geral</Link>
-          <a href="#">Motoristas</a>
+          <Link href="/" className="on">Motoristas</Link>
+          <Link href="/painel">Visão Geral (Gamificação)</Link>
           <a href="#">Indicadores</a>
           <a href="#">Recálculo</a>
           <a href="#">Master Drive</a>
