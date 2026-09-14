@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 
@@ -14,6 +14,7 @@ interface Motorista {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [motoristas, setMotoristas] = useState<Motorista[]>([]);
   const [usuario, setUsuario] = useState<{ email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,108 +56,109 @@ export default function Dashboard() {
     return <div style={{ padding: '20px' }}>Carregando...</div>;
   }
 
+  const [busca, setBusca] = useState('');
+  const filtrados = motoristas.filter((m) => m.nome.toLowerCase().includes(busca.toLowerCase()));
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        <h1 style={{ marginBottom: '30px' }}>Condução Econômica</h1>
-        
-        {error && (
-          <div style={{
-            background: 'var(--freio-fx)',
-            color: 'var(--freio)',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            marginBottom: '20px',
-          }}>
-            {error}
-          </div>
-        )}
+    <div className="shell">
+      <aside>
+        <div className="brandmark">
+          <svg width="30" height="30" viewBox="0 0 30 30"><path d="M4 22 L14 6 L18 6 L10 22 Z" fill="#d99a3f" /><path d="M15 22 L23 8 L27 8 L19 22 Z" fill="#f2ede4" /></svg>
+          <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
+        </div>
+        <nav>
+          <a href="/" className="on">Painel geral</a>
+          <a href="#">Motoristas</a>
+          <a href="#">Indicadores</a>
+          <a href="#">Recálculo</a>
+          <a href="#">Master Drive</a>
+          <a href="#">Versões</a>
+          <a href="#">Diagnóstico</a>
+          <a href="#">Relatórios</a>
+        </nav>
+        <div className="side-foot">DADO CERTO, DECISÃO RÁPIDA</div>
+      </aside>
 
-        {usuario && (
-          <p style={{ marginBottom: '20px', color: 'var(--sub)' }}>
-            Conectado como: <strong>{usuario.email}</strong>
-          </p>
-        )}
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: '16px',
-        }}>
-          {motoristas.map((motorista) => (
-            <Link
-              key={motorista.id}
-              href={`/motorista/${motorista.id}`}
-              style={{
-                background: 'var(--card)',
-                border: '1px solid var(--line)',
-                borderRadius: '12px',
-                padding: '16px',
-                textDecoration: 'none',
-                color: 'inherit',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--brand)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--line)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: 'var(--brand)',
-                  color: 'var(--brand-ink)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  flexShrink: 0,
-                }}>
-                  {motorista.nome.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontSize: '14px', marginBottom: '4px' }}>
-                    {motorista.nome}
-                  </h3>
-                  <p style={{ fontSize: '12px', color: 'var(--mute)', margin: 0 }}>
-                    {motorista.matricula ? `Mat. ${motorista.matricula}` : 'Sem matrícula'}
-                  </p>
-                </div>
-              </div>
-              {!motorista.ativo && (
-                <p style={{
-                  fontSize: '11px',
-                  color: 'var(--freio)',
-                  background: 'var(--freio-fx)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  margin: 0,
-                  display: 'inline-block',
-                }}>
-                  Inativo
-                </p>
-              )}
-            </Link>
-          ))}
+      <main>
+        <div className="topbar">
+          <span className="trilha"><b>Painel geral</b> &nbsp;›&nbsp; Motoristas</span>
+          <span className="spacer"></span>
+          <span className="chip">🏢 Transabril</span>
+          {usuario && <span className="chip">👤 {usuario.email}</span>}
         </div>
 
-        {motoristas.length === 0 && !error && (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px 20px',
-            color: 'var(--mute)',
-          }}>
-            <p>Nenhum motorista encontrado</p>
+        <div className="wrap">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h1 style={{ fontSize: 22 }}>Motoristas</h1>
+              <p className="sub" style={{ fontSize: 12.5, marginTop: 4 }}>
+                {motoristas.length} motorista(s) cadastrado(s) · condução econômica
+              </p>
+            </div>
+            <input
+              placeholder="Buscar por nome…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              style={{ maxWidth: 260 }}
+            />
           </div>
-        )}
-      </div>
+
+          {error && (
+            <div style={{ background: 'var(--freio-fx)', color: 'var(--freio)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>
+              {error}
+            </div>
+          )}
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ padding: '12px 16px' }}>Motorista</th>
+                  <th>Matrícula</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map((motorista) => (
+                  <tr
+                    key={motorista.id}
+                    onClick={() => router.push(`/motorista/${motorista.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%', background: 'var(--brand)', color: 'var(--brand-ink)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0,
+                        }}>
+                          {motorista.nome.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 500 }}>{motorista.nome}</span>
+                      </div>
+                    </td>
+                    <td className="n">{motorista.matricula || '—'}</td>
+                    <td>
+                      {motorista.ativo ? (
+                        <span className="pill" style={{ background: 'var(--pista-fx)', color: 'var(--pista)' }}>Ativo</span>
+                      ) : (
+                        <span className="pill" style={{ background: 'var(--freio-fx)', color: 'var(--freio)' }}>Inativo</span>
+                      )}
+                    </td>
+                    <td className="num" style={{ color: 'var(--sinal)' }}>Ver detalhes →</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filtrados.length === 0 && !error && (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--mute)' }}>
+              <p>Nenhum motorista encontrado</p>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
