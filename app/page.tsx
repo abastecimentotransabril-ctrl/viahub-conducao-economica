@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase-client';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [usuario, setUsuario] = useState<{ email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
 
   useEffect(() => {
     const verificarLogin = async () => {
@@ -26,7 +28,7 @@ export default function Dashboard() {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !user) {
-          window.location.href = '/auth/login';
+          router.push('/auth/login');
           return;
         }
 
@@ -56,7 +58,6 @@ export default function Dashboard() {
     return <div style={{ padding: '20px' }}>Carregando...</div>;
   }
 
-  const [busca, setBusca] = useState('');
   const filtrados = motoristas.filter((m) => m.nome.toLowerCase().includes(busca.toLowerCase()));
 
   return (
@@ -67,7 +68,7 @@ export default function Dashboard() {
           <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
         </div>
         <nav>
-          <a href="/" className="on">Painel geral</a>
+          <Link href="/" className="on">Painel geral</Link>
           <a href="#">Motoristas</a>
           <a href="#">Indicadores</a>
           <a href="#">Recálculo</a>

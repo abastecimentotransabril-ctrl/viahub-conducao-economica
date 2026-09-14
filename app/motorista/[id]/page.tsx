@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
 import { nf, sinal, iniciais, corBanda, corFaixaNota, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
@@ -117,7 +118,7 @@ export default function MotoristaDetalhe() {
       } else {
         setMdErro(json.erro || 'Erro ao salvar atendimento');
       }
-    } catch (e) {
+    } catch {
       setMdErro('Erro ao salvar atendimento');
     } finally {
       setMdEnviando(false);
@@ -215,7 +216,7 @@ export default function MotoristaDetalhe() {
           <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
         </div>
         <nav>
-          <a href="/">Painel geral</a>
+          <Link href="/">Painel geral</Link>
           <a href="#" className="on">Motoristas</a>
           <a href="#">Indicadores</a>
           <a href="#">Recálculo</a>
@@ -632,7 +633,7 @@ export default function MotoristaDetalhe() {
                       </div>
                       <div className="field">
                         <label>Resultado da conversa</label>
-                        <select value={mdResultado} onChange={(e) => setMdResultado(e.target.value as any)}>
+                        <select value={mdResultado} onChange={(e) => setMdResultado(e.target.value as 'sem_acao' | 'orientacao_registrada' | 'correcao_de_dado')}>
                           <option value="sem_acao">Sem necessidade de ação</option>
                           <option value="orientacao_registrada">Orientação registrada</option>
                           <option value="correcao_de_dado">Correção de dado de origem</option>
