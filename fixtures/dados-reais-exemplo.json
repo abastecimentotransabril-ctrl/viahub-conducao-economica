@@ -1,0 +1,100 @@
+{
+  "_observacao": "Todos os valores abaixo vêm de pacotes reais da Maxtrack, extraídos e validados em rodadas anteriores desta conversa. Não são dados fictícios de exemplo — são uma amostra real e pequena (18 motoristas, um único dia de operação, 09/09/2026). Trate como fixture de desenvolvimento e teste, não como cobertura completa da frota da Transabril.",
+
+  "config": {
+    "versao": "Mapeamento operacional Maxtrack",
+    "origem": "Mesmos pesos da lâmina de premiação original da Transabril, apontando para os campos que a integração Maxtrack efetivamente entrega hoje.",
+    "regras": {
+      "sentinela": 1000,
+      "casas": 1,
+      "minCoberturaPct": 70,
+      "politicaSemDadoPadrao": "redistribuir"
+    },
+    "faixasNota": [
+      {"min": 90, "rotulo": "Ouro"},
+      {"min": 80, "rotulo": "Prata"},
+      {"min": 70, "rotulo": "Bronze"},
+      {"min": 0,  "rotulo": "Sem premiação"}
+    ],
+    "faixasClassificacaoPressao": [
+      {"ate": 60,  "rotulo": "Ideal"},
+      {"ate": 70,  "rotulo": "Atenção"},
+      {"ate": 100, "rotulo": "Crítico"}
+    ],
+    "indicadores": [
+      {"mnem": "INI_VERDE",   "nome": "Início de faixa verde",        "peso": 40, "tipo": "pontua",    "fonte": "rpmZone",            "nota0": 0, "nota100": 100},
+      {"mnem": "INERCIA",     "nome": "Aproveitamento de embalo",     "peso": 25, "tipo": "pontua",    "fonte": "inertiaUsage",       "nota0": 0, "nota100": 100},
+      {"mnem": "IDLE",        "nome": "Motor ligado parado",          "peso": 15, "tipo": "pontua",    "fonte": "iddleTime",          "nota0": 0, "nota100": 100},
+      {"mnem": "ACIMA_VERDE", "nome": "Aceleração acima do verde",    "peso": 10, "tipo": "pontua",    "fonte": "accelerationExcess", "nota0": 0, "nota100": 100},
+      {"mnem": "PILOTO",      "nome": "Piloto automático",            "peso": 5,  "tipo": "pontua",    "fonte": null,                 "nota0": null, "nota100": null, "observacao": "sem campo de percentual de uso confirmado na integração Maxtrack atual"},
+      {"mnem": "EXC_VEL",     "nome": "Excesso de velocidade",        "peso": 5,  "tipo": "pontua",    "fonte": null,                 "nota0": null, "nota100": null, "observacao": "sem campo de percentual de viagem confirmado na integração Maxtrack atual"},
+      {"mnem": "PRESSAO",     "nome": "Pressão no acelerador",        "peso": 0,  "tipo": "classifica","fonte": "throttleAgregation", "nota0": null, "nota100": null}
+    ]
+  },
+
+  "motoristaExemplo": {
+    "nome": "José Joel Teodoro",
+    "cpfMascarado": "570.***.**6-00",
+    "matricula": "201",
+    "placa": "SIE1F96",
+    "modeloEquipamento": "MTC800-ADV",
+    "equipmentId": 82,
+    "grupoMaxtrackId": 36,
+    "empresaCnpj": "41705476000105",
+    "leituras": [
+      {
+        "id": "L1",
+        "timestampUnix": 1788971405,
+        "horaBRT": "13:30",
+        "indicadoresBrutos": {"rpmZone": 85, "inertiaUsage": 100, "iddleTime": 100, "accelerationExcess": 100, "throttleAgregation": 54, "global": 91},
+        "velocidadeKmh": 17,
+        "rpm": 1490,
+        "odometroKm": 277833.4,
+        "consumoBruto": 148555056,
+        "consumoUnidade": "não confirmada — não converter nem exibir como litros",
+        "posicao": {"county": "Perdizes", "uf": "MG", "rua": "Fazenda Perdizes 10"},
+        "referenciaMaisProxima": {"nome": "TA-347 Declive Sinuoso", "grupo": "Áreas 60km/h", "distanciaKm": 43.8},
+        "eventoBrutoRegistrado": "Fim acelerador excessivo (em andamento há 9.000 s)"
+      },
+      {
+        "id": "L2",
+        "timestampUnix": 1788972607,
+        "horaBRT": "13:50",
+        "indicadoresBrutos": {"rpmZone": 53, "inertiaUsage": 94, "iddleTime": 100, "accelerationExcess": 100, "throttleAgregation": 54, "global": 80},
+        "velocidadeKmh": 65,
+        "rpm": 1312,
+        "odometroKm": 277847.4,
+        "consumoBruto": 148572960,
+        "consumoUnidade": "não confirmada — não converter nem exibir como litros",
+        "posicao": {"county": "Perdizes", "uf": "MG", "rua": "BR-262"},
+        "referenciaMaisProxima": {"nome": "TA-408 Trevo de Araxá", "grupo": "Áreas 40km/h", "distanciaKm": 36.4},
+        "eventoBrutoRegistrado": "Fim acelerador excessivo (em andamento há 49.000 s)"
+      }
+    ],
+    "notaFinalCalculada": {
+      "L1": 93.3,
+      "L2": 77.4,
+      "observacao": "Calculada com a config acima. A nota bruta do próprio equipamento (driverScore.global) é diferente (91 e 80) porque a Maxtrack usa pesos proprietários próprios, não os da Transabril — as duas notas devem ser exibidas lado a lado na interface, nunca uma no lugar da outra."
+    }
+  },
+
+  "frotaElegivelDoDia": {
+    "_observacao": "Nota final do dia 09/09/2026 para os motoristas com cobertura de peso >= 70% (elegíveis). Calculada com a mesma config acima. Motoristas com cobertura abaixo de 70% (telemetria sem CAN ou sentinela em quase todos os campos) foram excluídos do ranking, não zerados.",
+    "ranking": [
+      {"posicao": 1,  "nome": "Celso Fabricio Costa",           "placa": "QUT6270", "nota": 100.0},
+      {"posicao": 2,  "nome": "Cleilson Sabino Souza Garcia",   "placa": "RKK7C25", "nota": 100.0},
+      {"posicao": 3,  "nome": "Ivan Martins Dos Santos",        "placa": "SYK2H31", "nota": 99.1},
+      {"posicao": 4,  "nome": "Cristiano Marques De Sa",        "placa": "SYM5I12", "nota": 97.4},
+      {"posicao": 5,  "nome": "Mauricio Meirelles",             "placa": "SYK2H28", "nota": 94.8},
+      {"posicao": 6,  "nome": "Pedro Paulo De Paula Miranda",   "placa": "SHP9J22", "nota": 82.8},
+      {"posicao": 7,  "nome": "Jose Joel Teodoro",              "placa": "SIE1F96", "nota": 77.4},
+      {"posicao": 8,  "nome": "Jose Luiz Fernandes",            "placa": "RVH4H74", "nota": 67.4},
+      {"posicao": 9,  "nome": "Reginaldo Bastos Dos Santos",    "placa": "TCX5E19", "nota": 55.6},
+      {"posicao": 10, "nome": "Carlos Soares Dos Santos",       "placa": "RJZ5E23", "nota": 34.0}
+    ],
+    "excluidosPorCoberturaBaixa": [
+      {"nome": "Ivan Fernandes Da Silva",   "placa": "QNO9190", "motivo": "cobertura de peso 15%, abaixo do mínimo de 70%"},
+      {"nome": "Braulio Aquino Filgueiras", "placa": "QPY0688", "motivo": "cobertura de peso 15%, abaixo do mínimo de 70%"}
+    ]
+  }
+}

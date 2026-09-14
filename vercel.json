@@ -1,0 +1,10 @@
+{
+  "name": "viahub-conducao-economica",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": true
+  }
+}

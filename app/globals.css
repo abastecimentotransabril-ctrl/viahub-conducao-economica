@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #f1efea;
+  --card: #ffffff;
+  --line: #e4e0d6;
+  --line2: #d7d2c4;
+  --ink: #211f1a;
+  --sub: #6f6a5c;
+  --mute: #a39d8c;
+  --side: #15181a;
+  --side-line: #262b2c;
+  --side-txt: #aeb3af;
+  --brand: #d99a3f;
+  --brand-ink: #231a0a;
+  --pista: #3f9d5d;
+  --pista-fx: #e7f3ea;
+  --ambar: #d9932f;
+  --ambar-fx: #faf1e0;
+  --freio: #d1493c;
+  --freio-fx: #fbeae7;
+  --sinal: #3f7ea8;
+  --sinal-fx: #e9f1f6;
+  --gauge: #15181a;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --serif: 'Fraunces', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--sinal);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: var(--sans);
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
+}
+
+input, select, textarea {
+  background: var(--card);
+  border: 1px solid var(--line2);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 7px 9px;
+  width: 100%;
+  border-radius: 6px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--sinal);
+  outline-offset: 2px;
+}
+
+label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--sub);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+/* Utilitários */
+.n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sub {
+  color: var(--sub);
+}
+
+.mute {
+  color: var(--mute);
+}
+
+.c-pista {
+  color: var(--pista);
+}
+
+.c-ambar {
+  color: var(--ambar);
+}
+
+.c-freio {
+  color: var(--freio);
+}
+
+.c-sinal {
+  color: var(--sinal);
+}

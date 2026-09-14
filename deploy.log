@@ -1,0 +1,3 @@
+Vercel CLI 59.16.0 (Node.js 22.22.2)
+Loading teams…
+Error: The token provided via VERCEL_TOKEN environment variable is not valid. Please provide a valid token.
