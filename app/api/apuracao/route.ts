@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase-client';
 import { calcularNotaFinal } from '@/lib/motor-apuracao';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function POST(request: NextRequest) {
   try {
     const { motorista_id, periodo_inicio, periodo_fim } = await request.json();
