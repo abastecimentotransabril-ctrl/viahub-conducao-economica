@@ -15,6 +15,8 @@ export async function GET(
     const resolvedParams = await params;
     const searchParams = request.nextUrl.searchParams;
 
+    // Onda 1: autenticação (sequencial por necessidade — precisa do token
+    // validado antes de qualquer outra coisa)
     const { user, error: authError } = await getAuthenticatedUser(request);
     if (authError || !user) {
       return NextResponse.json({ sucesso: false, erro: authError || 'Não autenticado' }, { status: 401 });
@@ -30,70 +32,78 @@ export async function GET(
       return NextResponse.json({ sucesso: false, erro: 'Usuário não encontrado' }, { status: 404 });
     }
 
-    const { data: motorista } = await supabaseServer
-      .from('motoristas')
-      .select('*')
-      .eq('id', resolvedParams.id)
-      .eq('empresa_id', usuario.empresa_id)
-      .single();
+    const agora = new Date();
+    const trintaDiasAtras = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const dataInicio = searchParams.get('inicio') || trintaDiasAtras.toISOString();
+    const dataFim = searchParams.get('fim') || agora.toISOString();
+
+    // Onda 2: TUDO que só depende de usuario.empresa_id / resolvedParams.id
+    // roda em paralelo — nenhuma dessas consultas depende do resultado de outra.
+    const [
+      { data: motorista },
+      { data: alocacao },
+      { data: versaoVigente },
+      { data: leiturasRaw },
+      { data: agregadoPeriodo },
+      { data: agregadosFrota },
+      { data: atendimentos },
+    ] = await Promise.all([
+      supabaseServer.from('motoristas').select('*').eq('id', resolvedParams.id).eq('empresa_id', usuario.empresa_id).single(),
+      supabaseServer.from('alocacoes_motorista_veiculo').select('veiculo_id').eq('motorista_id', resolvedParams.id).is('fim', null).order('inicio', { ascending: false }).limit(1).maybeSingle(),
+      supabaseServer.from('versoes_config').select('id, nome').eq('empresa_id', usuario.empresa_id).eq('vigente', true).maybeSingle(),
+      supabaseServer.from('leituras_telemetria').select('*').eq('motorista_id', resolvedParams.id).order('timestamp_leitura', { ascending: false }).limit(LIMITE_LEITURAS_DETALHE),
+      supabaseServer.rpc('apurar_periodo_motorista', { p_motorista_id: resolvedParams.id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
+      supabaseServer.rpc('apurar_periodo_frota', { p_empresa_id: usuario.empresa_id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
+      supabaseServer.from('atendimentos_master_drive').select('*').eq('motorista_id', resolvedParams.id).order('criado_em', { ascending: false }).limit(10),
+    ]);
 
     if (!motorista) {
       return NextResponse.json({ sucesso: false, erro: 'Motorista não encontrado' }, { status: 404 });
     }
 
-    const { data: alocacao } = await supabaseServer
-      .from('alocacoes_motorista_veiculo')
-      .select('veiculo_id')
-      .eq('motorista_id', resolvedParams.id)
-      .is('fim', null)
-      .order('inicio', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Onda 3: consultas que dependem de resultados da onda 2, mas são
+    // independentes ENTRE SI — também rodam em paralelo.
+    const veiculoIdsFrota = Array.from(new Set((agregadosFrota || []).map((a: any) => a.veiculo_id)));
+    const motoristaIdsFrota = Array.from(new Set((agregadosFrota || []).map((a: any) => a.motorista_id).filter(Boolean)));
 
-    let veiculo = null;
-    if (alocacao) {
-      const { data: v } = await supabaseServer.from('veiculos').select('*').eq('id', alocacao.veiculo_id).single();
-      veiculo = v;
-    }
+    const [
+      { data: veiculo },
+      { data: indicadores },
+      { data: faixasNota },
+      { data: faixasClassificacao },
+      { data: regrasArr },
+      { data: veiculosInfo },
+      { data: motoristasInfo },
+    ] = await Promise.all([
+      alocacao?.veiculo_id
+        ? supabaseServer.from('veiculos').select('*').eq('id', alocacao.veiculo_id).single()
+        : Promise.resolve({ data: null }),
+      versaoVigente ? supabaseServer.from('indicadores').select('*').eq('versao_config_id', versaoVigente.id) : Promise.resolve({ data: [] as any[] }),
+      versaoVigente ? supabaseServer.from('faixas_nota').select('*').eq('versao_config_id', versaoVigente.id) : Promise.resolve({ data: [] as any[] }),
+      versaoVigente ? supabaseServer.from('faixas_classificacao').select('*').eq('versao_config_id', versaoVigente.id) : Promise.resolve({ data: [] as any[] }),
+      versaoVigente ? supabaseServer.from('regras_apuracao').select('*').eq('versao_config_id', versaoVigente.id).maybeSingle() : Promise.resolve({ data: null }),
+      veiculoIdsFrota.length > 0 ? supabaseServer.from('veiculos').select('id, placa').in('id', veiculoIdsFrota) : Promise.resolve({ data: [] as any[] }),
+      motoristaIdsFrota.length > 0 ? supabaseServer.from('motoristas').select('id, nome').in('id', motoristaIdsFrota) : Promise.resolve({ data: [] as any[] }),
+    ]);
 
-    const { data: versaoVigente } = await supabaseServer
-      .from('versoes_config')
-      .select('id, nome')
-      .eq('empresa_id', usuario.empresa_id)
-      .eq('vigente', true)
-      .maybeSingle();
+    const indicadoresArr = indicadores || [];
+    const faixasNotaArr = faixasNota || [];
+    const regras = regrasArr || { sentinela: 1000, casas_decimais: 1, cobertura_minima_pct: 70 };
 
-    let indicadores: any[] = [];
-    let faixasNota: any[] = [];
-    let faixasClassificacao: any[] = [];
-    let regras = { sentinela: 1000, casas_decimais: 1, cobertura_minima_pct: 70 };
-
-    if (versaoVigente) {
-      const [{ data: ind }, { data: fn }, { data: fc }, { data: rg }] = await Promise.all([
-        supabaseServer.from('indicadores').select('*').eq('versao_config_id', versaoVigente.id),
-        supabaseServer.from('faixas_nota').select('*').eq('versao_config_id', versaoVigente.id),
-        supabaseServer.from('faixas_classificacao').select('*').eq('versao_config_id', versaoVigente.id),
-        supabaseServer.from('regras_apuracao').select('*').eq('versao_config_id', versaoVigente.id).maybeSingle(),
-      ]);
-      indicadores = ind || [];
-      faixasNota = fn || [];
-      faixasClassificacao = fc || [];
-      if (rg) regras = rg;
-    }
-
-    // Leituras individuais — lidas da tabela INDEXADA (rápida), não mais
-    // escaneando o JSON bruto de maxtrack_mensagens_raw a cada request.
-    const { data: leiturasRaw } = await supabaseServer
-      .from('leituras_telemetria')
-      .select('*')
-      .eq('motorista_id', resolvedParams.id)
-      .order('timestamp_leitura', { ascending: false })
-      .limit(LIMITE_LEITURAS_DETALHE);
+    const calcular = (indicadoresBrutos: Record<string, number | null> | null): ResultadoApuracao | null => {
+      if (!indicadoresBrutos || indicadoresArr.length === 0) return null;
+      return calcularNotaFinal(
+        indicadoresBrutos,
+        indicadoresArr,
+        faixasNotaArr.map((f: any) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
+        regras
+      );
+    };
 
     const leituras = (leiturasRaw || [])
       .slice()
       .reverse()
-      .map((l) => ({
+      .map((l: any) => ({
         id: l.id,
         timestampUnix: Math.floor(new Date(l.timestamp_leitura).getTime() / 1000),
         dataHoraISO: l.timestamp_leitura,
@@ -108,36 +118,13 @@ export async function GET(
         indicadoresBrutos: l.indicadores_brutos,
       }));
 
-    const calcular = (indicadoresBrutos: Record<string, number | null> | null): ResultadoApuracao | null => {
-      if (!indicadoresBrutos || indicadores.length === 0) return null;
-      return calcularNotaFinal(
-        indicadoresBrutos,
-        indicadores,
-        faixasNota.map((f) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
-        regras
-      );
-    };
-
     const leiturasComNota = leituras.map((l) => ({ leitura: l, resultado: calcular(l.indicadoresBrutos) }));
     const ultimaLeitura = leiturasComNota[leiturasComNota.length - 1] || null;
     const penultimaLeitura = leiturasComNota[leiturasComNota.length - 2] || null;
 
-    // Cálculo acumulado por período (padrão: últimos 30 dias, ou o que vier na query)
-    const agora = new Date();
-    const trintaDiasAtras = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const dataInicio = searchParams.get('inicio') || trintaDiasAtras.toISOString();
-    const dataFim = searchParams.get('fim') || agora.toISOString();
-
     let resultadoPeriodo: (ResultadoApuracao & { qtdLeituras: number; primeiraLeitura: string | null; ultimaLeituraPeriodo: string | null }) | null = null;
-
-    const { data: agregadoPeriodo } = await supabaseServer.rpc('apurar_periodo_motorista', {
-      p_motorista_id: resolvedParams.id,
-      p_data_inicio: dataInicio,
-      p_data_fim: dataFim,
-    });
-
     const agregado = agregadoPeriodo?.[0];
-    if (agregado && agregado.qtd_leituras > 0 && indicadores.length > 0) {
+    if (agregado && agregado.qtd_leituras > 0 && indicadoresArr.length > 0) {
       const indicadorBruto = {
         rpmZone: agregado.avg_rpmzone,
         inertiaUsage: agregado.avg_inertiausage,
@@ -147,8 +134,8 @@ export async function GET(
       };
       const r = calcularNotaFinal(
         indicadorBruto,
-        indicadores,
-        faixasNota.map((f) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
+        indicadoresArr,
+        faixasNotaArr.map((f: any) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
         regras
       );
       resultadoPeriodo = {
@@ -159,62 +146,36 @@ export async function GET(
       };
     }
 
-    // Ranking do período (via função agregada indexada — não escaneia JSON bruto)
     const ranking: Array<{ placa: string; nome: string | null; nota: number | null; faixa: string | null }> = [];
-    if (indicadores.length > 0) {
-      const { data: agregadosFrota } = await supabaseServer.rpc('apurar_periodo_frota', {
-        p_empresa_id: usuario.empresa_id,
-        p_data_inicio: dataInicio,
-        p_data_fim: dataFim,
-      });
+    if (indicadoresArr.length > 0 && agregadosFrota) {
+      const placaPorVeiculo = new Map((veiculosInfo || []).map((v: any) => [v.id, v.placa]));
+      const nomePorMotorista = new Map((motoristasInfo || []).map((m: any) => [m.id, m.nome]));
 
-      if (agregadosFrota && agregadosFrota.length > 0) {
-        const veiculoIds = Array.from(new Set(agregadosFrota.map((a: any) => a.veiculo_id)));
-        const motoristaIds = Array.from(new Set(agregadosFrota.map((a: any) => a.motorista_id).filter(Boolean)));
-
-        const [{ data: veiculosInfo }, { data: motoristasInfo }] = await Promise.all([
-          supabaseServer.from('veiculos').select('id, placa').in('id', veiculoIds),
-          motoristaIds.length > 0
-            ? supabaseServer.from('motoristas').select('id, nome').in('id', motoristaIds)
-            : Promise.resolve({ data: [] as any[] }),
-        ]);
-
-        const placaPorVeiculo = new Map((veiculosInfo || []).map((v) => [v.id, v.placa]));
-        const nomePorMotorista = new Map((motoristasInfo || []).map((m) => [m.id, m.nome]));
-
-        for (const a of agregadosFrota) {
-          const indicadorBruto = {
-            rpmZone: a.avg_rpmzone,
-            inertiaUsage: a.avg_inertiausage,
-            iddleTime: a.avg_iddletime,
-            accelerationExcess: a.avg_accelerationexcess,
-            throttleAgregation: a.avg_throttleagregation,
-          };
-          const r = calcularNotaFinal(
-            indicadorBruto,
-            indicadores,
-            faixasNota.map((f) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
-            regras
-          );
-          if (r.elegivel) {
-            ranking.push({
-              placa: placaPorVeiculo.get(a.veiculo_id) || '—',
-              nome: a.motorista_id ? nomePorMotorista.get(a.motorista_id) || null : null,
-              nota: r.nota_final,
-              faixa: r.faixa_rotulo,
-            });
-          }
+      for (const a of agregadosFrota) {
+        const indicadorBruto = {
+          rpmZone: a.avg_rpmzone,
+          inertiaUsage: a.avg_inertiausage,
+          iddleTime: a.avg_iddletime,
+          accelerationExcess: a.avg_accelerationexcess,
+          throttleAgregation: a.avg_throttleagregation,
+        };
+        const r = calcularNotaFinal(
+          indicadorBruto,
+          indicadoresArr,
+          faixasNotaArr.map((f: any) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
+          regras
+        );
+        if (r.elegivel) {
+          ranking.push({
+            placa: placaPorVeiculo.get(a.veiculo_id) || '—',
+            nome: a.motorista_id ? nomePorMotorista.get(a.motorista_id) || null : null,
+            nota: r.nota_final,
+            faixa: r.faixa_rotulo,
+          });
         }
-        ranking.sort((a, b) => (b.nota || 0) - (a.nota || 0));
       }
+      ranking.sort((a, b) => (b.nota || 0) - (a.nota || 0));
     }
-
-    const { data: atendimentos } = await supabaseServer
-      .from('atendimentos_master_drive')
-      .select('*')
-      .eq('motorista_id', resolvedParams.id)
-      .order('criado_em', { ascending: false })
-      .limit(10);
 
     let cpf: string | null = null;
     if (usuario.papel === 'rh' || usuario.papel === 'admin_gamificacao') {
@@ -229,9 +190,9 @@ export async function GET(
         motorista: { ...motorista, cpf },
         veiculo,
         configVigente: versaoVigente,
-        indicadores,
-        faixasNota,
-        faixasClassificacao,
+        indicadores: indicadoresArr,
+        faixasNota: faixasNotaArr,
+        faixasClassificacao: faixasClassificacao || [],
         leiturasComNota,
         ultimaLeitura,
         penultimaLeitura,

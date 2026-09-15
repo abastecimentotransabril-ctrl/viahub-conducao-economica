@@ -30,32 +30,18 @@ export async function GET(request: NextRequest) {
     const dataInicio = searchParams.get('inicio') || trintaDiasAtras.toISOString();
     const dataFim = searchParams.get('fim') || agora.toISOString();
 
-    // Configuração vigente
-    const { data: versaoVigente } = await supabaseServer
-      .from('versoes_config')
-      .select('id, nome')
-      .eq('empresa_id', usuario.empresa_id)
-      .eq('vigente', true)
-      .maybeSingle();
+    const rpcNome = agrupar === 'veiculo' ? 'apurar_periodo_veiculos' : 'apurar_periodo_frota';
+
+    // Onda 1: config vigente e a agregação SQL são independentes entre si —
+    // rodam em paralelo (a RPC só precisa de empresa_id + datas).
+    const [{ data: versaoVigente }, { data: agregados, error: rpcError }] = await Promise.all([
+      supabaseServer.from('versoes_config').select('id, nome').eq('empresa_id', usuario.empresa_id).eq('vigente', true).maybeSingle(),
+      supabaseServer.rpc(rpcNome, { p_empresa_id: usuario.empresa_id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
+    ]);
 
     if (!versaoVigente) {
       return NextResponse.json({ sucesso: false, erro: 'Nenhuma configuração de indicadores vigente para esta empresa' }, { status: 400 });
     }
-
-    const [{ data: indicadores }, { data: faixasNota }, { data: regrasArr }] = await Promise.all([
-      supabaseServer.from('indicadores').select('*').eq('versao_config_id', versaoVigente.id),
-      supabaseServer.from('faixas_nota').select('*').eq('versao_config_id', versaoVigente.id),
-      supabaseServer.from('regras_apuracao').select('*').eq('versao_config_id', versaoVigente.id),
-    ]);
-    const regras = regrasArr?.[0] || { sentinela: 1000, casas_decimais: 1, cobertura_minima_pct: 70 };
-
-    // Agregação rápida via função SQL (indexada) — uma única query
-    const rpcNome = agrupar === 'veiculo' ? 'apurar_periodo_veiculos' : 'apurar_periodo_frota';
-    const { data: agregados, error: rpcError } = await supabaseServer.rpc(rpcNome, {
-      p_empresa_id: usuario.empresa_id,
-      p_data_inicio: dataInicio,
-      p_data_fim: dataFim,
-    });
 
     if (rpcError) {
       return NextResponse.json(
@@ -71,11 +57,21 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Nomes de motoristas e placas para exibição
     const motoristaIds = Array.from(new Set(agregados.map((a: any) => a.motorista_id).filter(Boolean)));
     const veiculoIds = Array.from(new Set(agregados.map((a: any) => a.veiculo_id).filter(Boolean)));
 
-    const [{ data: motoristasInfo }, { data: veiculosInfo }] = await Promise.all([
+    // Onda 2: tudo que depende da config vigente ou dos IDs da agregação,
+    // mas é independente entre si — uma única leva paralela.
+    const [
+      { data: indicadores },
+      { data: faixasNota },
+      { data: regrasArr },
+      { data: motoristasInfo },
+      { data: veiculosInfo },
+    ] = await Promise.all([
+      supabaseServer.from('indicadores').select('*').eq('versao_config_id', versaoVigente.id),
+      supabaseServer.from('faixas_nota').select('*').eq('versao_config_id', versaoVigente.id),
+      supabaseServer.from('regras_apuracao').select('*').eq('versao_config_id', versaoVigente.id),
       motoristaIds.length > 0
         ? supabaseServer.from('motoristas').select('id, nome, matricula').in('id', motoristaIds)
         : Promise.resolve({ data: [] as any[] }),
@@ -84,8 +80,9 @@ export async function GET(request: NextRequest) {
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
-    const motoristaPorId = new Map((motoristasInfo || []).map((m) => [m.id, m]));
-    const veiculoPorId = new Map((veiculosInfo || []).map((v) => [v.id, v]));
+    const regras = regrasArr?.[0] || { sentinela: 1000, casas_decimais: 1, cobertura_minima_pct: 70 };
+    const motoristaPorId = new Map((motoristasInfo || []).map((m: any) => [m.id, m]));
+    const veiculoPorId = new Map((veiculosInfo || []).map((v: any) => [v.id, v]));
 
     const resultados = agregados.map((a: any) => {
       const indicadorBruto = {
@@ -98,11 +95,11 @@ export async function GET(request: NextRequest) {
       const resultado = calcularNotaFinal(
         indicadorBruto,
         indicadores || [],
-        (faixasNota || []).map((f) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
+        (faixasNota || []).map((f: any) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
         regras
       );
-      const motorista = a.motorista_id ? motoristaPorId.get(a.motorista_id) : null;
-      const veiculo = a.veiculo_id ? veiculoPorId.get(a.veiculo_id) : null;
+      const motorista: any = a.motorista_id ? motoristaPorId.get(a.motorista_id) : null;
+      const veiculo: any = a.veiculo_id ? veiculoPorId.get(a.veiculo_id) : null;
 
       return {
         motorista_id: a.motorista_id || null,
