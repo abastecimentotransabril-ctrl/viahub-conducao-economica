@@ -18,7 +18,6 @@ const MapaTrajeto = dynamic(() => import('@/app/components/MapaTrajeto'), {
   loading: () => <div style={{ height: 420, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mute)', fontSize: 12.5 }}>Carregando mapa…</div>,
 });
 
-type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'mapa' | 'masterdrive';
 type Role = 'gestor' | 'master';
 
 interface LeituraApi {
@@ -75,7 +74,6 @@ export default function MotoristaDetalhe() {
   const [dados, setDados] = useState<DetalheData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('resumo');
   const [role, setRole] = useState<Role>('gestor');
   const [leituraSelecionada, setLeituraSelecionada] = useState<string | null>(null);
   const [mostrarComposicao, setMostrarComposicao] = useState(false);
@@ -356,17 +354,17 @@ export default function MotoristaDetalhe() {
             </div>
           </div>
 
-          <div className="tabs" role="tablist">
-            <button role="tab" aria-selected={tab === 'resumo'} onClick={() => setTab('resumo')}>Resumo</button>
-            <button role="tab" aria-selected={tab === 'indicadores'} onClick={() => setTab('indicadores')}>Indicadores</button>
-            <button role="tab" aria-selected={tab === 'evolucao'} onClick={() => setTab('evolucao')}>Evolução</button>
-            <button role="tab" aria-selected={tab === 'mapa'} onClick={() => setTab('mapa')}>Mapa</button>
-            <button role="tab" aria-selected={tab === 'masterdrive'} onClick={() => setTab('masterdrive')}>Master Drive</button>
+          <div className="secoes-nav">
+            <a href="#secao-resumo">Resumo</a>
+            <a href="#secao-indicadores">Indicadores</a>
+            <a href="#secao-evolucao">Evolução</a>
+            <a href="#secao-mapa">Mapa</a>
+            <a href="#secao-masterdrive">Master Drive</a>
           </div>
 
-          {tab === 'resumo' && (
-            <div className="painel show">
-              <div className="g2" style={{ marginBottom: 16 }}>
+          <div className="painel show" id="secao-resumo">
+            <h2 className="secao-titulo">Resumo</h2>
+            <div className="g2" style={{ marginBottom: 16 }}>
                 <div className="gauge-card">
                   <h3>NOTA DE CONDUÇÃO</h3>
                   <div className="gauge-delta">
@@ -454,7 +452,7 @@ export default function MotoristaDetalhe() {
                 </div>
 
                 <div className="card">
-                  <h3>🌱 INDICADORES DE BOA CONDUÇÃO <span className="link-mais" style={{ cursor: 'pointer' }} onClick={() => setTab('indicadores')}>Ver detalhes →</span></h3>
+                  <h3>🌱 INDICADORES DE BOA CONDUÇÃO <a href="#secao-indicadores" className="link-mais">Ver detalhes →</a></h3>
                   <div className="rings-v2">
                     {pontuaIndicadores.map((ind) => {
                       const da = atual?.detalhe.find((d) => d.indicador === ind.mnemonico);
@@ -539,7 +537,7 @@ export default function MotoristaDetalhe() {
                   )}
                 </div>
                 <div className="card">
-                  <h3>EVOLUÇÃO DA NOTA <span className="link-mais" style={{ cursor: 'pointer' }} onClick={() => setTab('evolucao')}>ver aba →</span></h3>
+                  <h3>EVOLUÇÃO DA NOTA <a href="#secao-evolucao" className="link-mais">ver seção →</a></h3>
                   <div style={{ height: 90 }}>
                     <SparkGrande
                       valores={leiturasComNota.slice(-8).map((l) => l.resultado?.nota_final ?? null)}
@@ -636,10 +634,9 @@ export default function MotoristaDetalhe() {
                 </div>
               </div>
             </div>
-          )}
 
-          {tab === 'indicadores' && (
-            <div className="painel show">
+          <div className="painel show" id="secao-indicadores">
+            <h2 className="secao-titulo">Indicadores</h2>
               <div className="card">
                 <h3>COMPOSIÇÃO COMPLETA</h3>
                 <div className="tbox">
@@ -703,10 +700,9 @@ export default function MotoristaDetalhe() {
                 </div>
               </div>
             </div>
-          )}
 
-          {tab === 'evolucao' && (
-            <div className="painel show">
+          <div className="painel show" id="secao-evolucao">
+            <h2 className="secao-titulo">Evolução</h2>
               <div className="g2">
                 <div className="card">
                   <h3>EVOLUÇÃO DA NOTA</h3>
@@ -748,10 +744,9 @@ export default function MotoristaDetalhe() {
                 ) : <p className="sub" style={{ fontSize: 12.5 }}>Selecione uma leitura na lista ao lado.</p>}
               </div>
             </div>
-          )}
 
-          {tab === 'mapa' && (
-            <div className="painel show">
+          <div className="painel show" id="secao-mapa">
+            <h2 className="secao-titulo">Mapa</h2>
               <div className="card">
                 <h3>🗺️ TRAJETO NO PERÍODO <span className="tag">{dados.pontosTrajeto.length} ponto(s) com GPS válido</span></h3>
                 <p className="sub" style={{ fontSize: 12.5, marginBottom: 14 }}>
@@ -768,10 +763,9 @@ export default function MotoristaDetalhe() {
                 </p>
               </div>
             </div>
-          )}
 
-          {tab === 'masterdrive' && (
-            <div className="painel show">
+          <div className="painel show" id="secao-masterdrive">
+            <h2 className="secao-titulo">Master Drive</h2>
               <div className="card">
                 <div className="md-head">
                   <div>
@@ -838,7 +832,6 @@ export default function MotoristaDetalhe() {
                 </div>
               </div>
             </div>
-          )}
 
           <p className="mute" style={{ fontSize: 11.5, marginTop: 26, maxWidth: '82ch' }}>
             Piloto automático e excesso de velocidade entram na regra com peso 5 cada, mas a integração Maxtrack ainda não confirma o campo de percentual de viagem para nenhum dos dois neste modelo de equipamento — por isso aparecem como pendentes de integração, nunca como zero.
