@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
+import DateRangePicker from '@/app/components/DateRangePicker';
 
 interface ResultadoPainel {
   motorista_id: string | null;
@@ -117,12 +118,14 @@ export default function PainelVisaoGeral() {
         <div className="topbar">
           <span className="trilha"><b>Painel geral</b> &nbsp;›&nbsp; Visão Geral</span>
           <span className="spacer"></span>
-          <span className="chip" style={{ gap: 8 }}>
-            📅
-            <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
-            –
-            <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
-          </span>
+          <DateRangePicker
+            inicio={new Date(dataInicio + 'T00:00:00')}
+            fim={new Date(dataFim + 'T00:00:00')}
+            onChange={(i, f) => {
+              setDataInicio(i.toISOString().slice(0, 10));
+              setDataFim(f.toISOString().slice(0, 10));
+            }}
+          />
           <div className="role" role="group" aria-label="Agrupar por">
             <button aria-pressed={agrupar === 'motorista'} onClick={() => setAgrupar('motorista')}>Por motorista</button>
             <button aria-pressed={agrupar === 'veiculo'} onClick={() => setAgrupar('veiculo')}>Por veículo</button>

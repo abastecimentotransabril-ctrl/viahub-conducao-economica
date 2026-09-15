@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
+import DateRangePicker from '@/app/components/DateRangePicker';
 import { nf, sinal, iniciais, corBanda, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
 
 type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'masterdrive';
@@ -256,12 +257,14 @@ export default function MotoristaDetalhe() {
         <div className="topbar">
           <span className="trilha">‹ &nbsp;Motoristas &nbsp;›&nbsp; <b>{motorista.nome}</b></span>
           <span className="spacer"></span>
-          <span className="chip" style={{ gap: 8 }}>
-            📅
-            <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
-            –
-            <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} style={{ border: 'none', padding: 0, width: 110, fontSize: 12 }} />
-          </span>
+          <DateRangePicker
+            inicio={new Date(dataInicio + 'T00:00:00')}
+            fim={new Date(dataFim + 'T00:00:00')}
+            onChange={(i, f) => {
+              setDataInicio(i.toISOString().slice(0, 10));
+              setDataFim(f.toISOString().slice(0, 10));
+            }}
+          />
           <span className="chip">🏢 Transabril</span>
           <div className="role" role="group" aria-label="Visualizar como">
             <button aria-pressed={role === 'gestor'} onClick={() => setRole('gestor')}>Gestor</button>

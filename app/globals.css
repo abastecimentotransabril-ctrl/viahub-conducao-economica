@@ -344,3 +344,41 @@ main{min-width:0}
 
 /* Distribuição das leituras por banda (donut do motorista) */
 .dist-wrap{display:flex;align-items:center;gap:18px}
+
+/* ===== DateRangePicker ===== */
+.drp-wrap{position:relative;display:inline-block}
+.drp-trigger{cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.drp-popover{position:absolute;top:calc(100% + 8px);left:0;z-index:50;background:var(--gauge);color:#f2ede4;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);overflow:hidden;width:min(640px,92vw)}
+.drp-body{display:flex}
+.drp-presets{width:150px;flex:0 0 auto;padding:16px 10px;border-right:1px solid var(--side-line);display:flex;flex-direction:column;gap:4px}
+.drp-presets-title{font-size:10px;letter-spacing:.08em;color:#8b9490;margin-bottom:8px;padding:0 6px}
+.drp-preset-btn{background:none;border:none;color:#d7d2c4;text-align:left;padding:9px 10px;border-radius:8px;font-size:12.5px;cursor:pointer}
+.drp-preset-btn:hover{background:rgba(255,255,255,.06)}
+.drp-preset-btn.ativo{background:var(--brand);color:var(--brand-ink);font-weight:500}
+.drp-calendars{flex:1;padding:16px 18px;min-width:0}
+.drp-calendars-nav{display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px}
+.drp-calendars-nav button{background:rgba(255,255,255,.08);border:none;color:#f2ede4;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:13px}
+.drp-calendars-nav button:hover{background:rgba(255,255,255,.16)}
+.drp-calendars-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.drp-month-title{font-size:12.5px;font-weight:600;text-transform:capitalize;margin-bottom:8px;text-align:center}
+.drp-weekdays{display:grid;grid-template-columns:repeat(7,1fr);font-size:9.5px;color:#8b9490;text-align:center;margin-bottom:4px}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.drp-day{background:none;border:none;color:#d7d2c4;font-size:11.5px;font-family:var(--mono);padding:6px 0;border-radius:6px;cursor:pointer;text-align:center}
+.drp-day:hover{background:rgba(255,255,255,.1)}
+.drp-day.fora-mes{color:#4a4f4d}
+.drp-day.em-range{background:rgba(217,154,63,.18);border-radius:0}
+.drp-day.range-inicio{background:var(--brand);color:var(--brand-ink);border-radius:6px 0 0 6px;font-weight:600}
+.drp-day.range-fim{background:var(--brand);color:var(--brand-ink);border-radius:0 6px 6px 0;font-weight:600}
+.drp-day.range-inicio.range-fim{border-radius:6px}
+.drp-day.hoje:not(.range-inicio):not(.range-fim){box-shadow:inset 0 0 0 1px #8b9490}
+.drp-footer{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--side-line);background:rgba(0,0,0,.15)}
+.drp-range-txt{font-size:11.5px;color:#8b9490;font-family:var(--mono)}
+.drp-link{background:none;border:none;color:#8b9490;font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.drp-aplicar{background:var(--brand);color:var(--brand-ink);border:none;font-size:12.5px;font-weight:500;padding:7px 16px;border-radius:8px;cursor:pointer}
+.drp-aplicar:disabled{opacity:.5;cursor:not-allowed}
+
+@media (max-width: 640px) {
+  .drp-body{flex-direction:column}
+  .drp-presets{width:100%;border-right:none;border-bottom:1px solid var(--side-line);flex-direction:row;flex-wrap:wrap}
+  .drp-calendars-grid{grid-template-columns:1fr}
+}
