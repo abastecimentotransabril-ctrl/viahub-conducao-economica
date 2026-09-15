@@ -122,7 +122,7 @@ export default function PainelVisaoGeral() {
           <div style={{ marginBottom: 20 }}>
             <h1 style={{ fontSize: 22 }}>Visão Geral — Condução Econômica</h1>
             <p className="sub" style={{ fontSize: 12.5, marginTop: 4 }}>
-              Cálculo acumulado de {new Date(dataInicio).toLocaleDateString('pt-BR')} a {new Date(dataFim).toLocaleDateString('pt-BR')} · {filtrados.length} {agrupar === 'motorista' ? 'motorista(s)' : 'veículo(s)'} com telemetria no período
+              Cálculo acumulado de {new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')} · {filtrados.length} {agrupar === 'motorista' ? 'motorista(s)' : 'veículo(s)'} com telemetria no período
             </p>
           </div>
 

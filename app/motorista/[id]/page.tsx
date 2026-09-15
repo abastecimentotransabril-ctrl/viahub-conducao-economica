@@ -280,7 +280,7 @@ export default function MotoristaDetalhe() {
                 ) : null}
               </div>
               <p className="hdr-note">
-                Configuração vigente: <b style={{ color: 'var(--ink)' }}>{dados.configVigente?.nome || 'nenhuma configuração ativa'}</b> · Cálculo acumulado de {new Date(dataInicio).toLocaleDateString('pt-BR')} a {new Date(dataFim).toLocaleDateString('pt-BR')}, com {atual?.qtdLeituras ?? 0} leitura(s) real(is) de telemetria.
+                Configuração vigente: <b style={{ color: 'var(--ink)' }}>{dados.configVigente?.nome || 'nenhuma configuração ativa'}</b> · Cálculo acumulado de {new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')}, com {atual?.qtdLeituras ?? 0} leitura(s) real(is) de telemetria.
               </p>
             </div>
             <div className="hero-panel">
@@ -332,8 +332,32 @@ export default function MotoristaDetalhe() {
                     </div>
                   </div>
                   <div className="gauge-msg">
-                    {atual?.motivo_inelegibilidade || (faixaAtualObj ? `Faixa: ${faixaAtualObj.rotulo}` : leiturasComNota.length === 0 ? 'Sem leituras de telemetria disponíveis' : '')}
+                    {atual?.motivo_inelegibilidade || (faixaAtualObj ? `Faixa: ${faixaAtualObj.rotulo}` : '')}
                   </div>
+                  {(!atual || atual.qtdLeituras === 0) && ultimaLeitura && (
+                    <div style={{ fontSize: 11.5, color: '#8b9490', marginTop: 4, lineHeight: 1.5 }}>
+                      Sem leituras entre {new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} e {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')} para este veículo.
+                      <br />Última leitura registrada: <b style={{ color: '#f2ede4' }}>{new Date(ultimaLeitura.leitura.dataHoraISO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</b>
+                      <br />
+                      <button
+                        className="gauge-link"
+                        style={{ marginTop: 4 }}
+                        onClick={() => {
+                          const dataUltima = new Date(ultimaLeitura.leitura.dataHoraISO);
+                          const trintaAntes = new Date(dataUltima.getTime() - 30 * 24 * 60 * 60 * 1000);
+                          setDataInicio(trintaAntes.toISOString().slice(0, 10));
+                          setDataFim(dataUltima.toISOString().slice(0, 10));
+                        }}
+                      >
+                        Ver últimos 30 dias até a última leitura →
+                      </button>
+                    </div>
+                  )}
+                  {(!atual || atual.qtdLeituras === 0) && !ultimaLeitura && (
+                    <div style={{ fontSize: 11.5, color: '#8b9490', marginTop: 4 }}>
+                      Nenhuma leitura de telemetria encontrada para este motorista, em nenhum período.
+                    </div>
+                  )}
                   <button className="gauge-link" onClick={() => setMostrarComposicao(!mostrarComposicao)}>
                     {mostrarComposicao ? 'Ocultar composição' : 'Ver como esta nota foi calculada'}
                   </button>
