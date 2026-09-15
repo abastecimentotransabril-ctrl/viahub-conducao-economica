@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
 import DateRangePicker from '@/app/components/DateRangePicker';
+import MotoristaSelector from '@/app/components/MotoristaSelector';
 import Sidebar from '@/app/components/Sidebar';
 import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
 import { nf, sinal, iniciais, corBanda, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
@@ -71,6 +72,8 @@ export default function MotoristaDetalhe() {
   const [leituraSelecionada, setLeituraSelecionada] = useState<string | null>(null);
   const [mostrarComposicao, setMostrarComposicao] = useState(false);
   const [mdFormAberto, setMdFormAberto] = useState(false);
+  const [exportarAberto, setExportarAberto] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const [mdIndicador, setMdIndicador] = useState('');
   const [mdResultado, setMdResultado] = useState<'sem_acao' | 'orientacao_registrada' | 'correcao_de_dado'>('sem_acao');
@@ -110,6 +113,33 @@ export default function MotoristaDetalhe() {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function exportarCsv() {
+    setExportando(true);
+    setExportarAberto(false);
+    try {
+      const inicioIso = new Date(dataInicio + 'T00:00:00').toISOString();
+      const fimIso = new Date(dataFim + 'T23:59:59').toISOString();
+      const response = await fetchAutenticado(
+        `/api/motoristas/${motoristaId}/exportar?inicio=${encodeURIComponent(inicioIso)}&fim=${encodeURIComponent(fimIso)}`
+      );
+      if (!response.ok) throw new Error('Falha ao gerar exportação');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `conducao-economica-${motoristaId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao exportar. Tente novamente.');
+    } finally {
+      setExportando(false);
     }
   }
 
@@ -247,6 +277,14 @@ export default function MotoristaDetalhe() {
             &nbsp;›&nbsp; <b>{motorista.nome}</b>
           </span>
           <span className="spacer"></span>
+          <MotoristaSelector
+            motoristaAtualId={motorista.id}
+            nome={motorista.nome}
+            placa={veiculo?.placa || null}
+            cpf={motorista.cpf}
+            dataInicio={dataInicio}
+            dataFim={dataFim}
+          />
           <DateRangePicker
             inicio={new Date(dataInicio + 'T00:00:00')}
             fim={new Date(dataFim + 'T00:00:00')}
@@ -260,7 +298,17 @@ export default function MotoristaDetalhe() {
             <button aria-pressed={role === 'gestor'} onClick={() => setRole('gestor')}>Gestor</button>
             <button aria-pressed={role === 'master'} onClick={() => setRole('master')}>Master Drive</button>
           </div>
-          <button className="btn sm" onClick={() => window.print()}>Exportar</button>
+          <div className="drp-wrap">
+            <button className="btn sm" onClick={() => setExportarAberto(!exportarAberto)} disabled={exportando}>
+              {exportando ? 'Exportando…' : 'Exportar'} ▾
+            </button>
+            {exportarAberto && (
+              <div className="export-menu">
+                <button onClick={exportarCsv}>📊 Exportar Excel (.csv)</button>
+                <button onClick={() => { setExportarAberto(false); window.print(); }}>🖨️ Imprimir / PDF</button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="wrap">
