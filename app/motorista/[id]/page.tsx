@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
 import DateRangePicker from '@/app/components/DateRangePicker';
@@ -10,8 +11,14 @@ import MotoristaSelector from '@/app/components/MotoristaSelector';
 import Sidebar from '@/app/components/Sidebar';
 import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
 import { nf, sinal, iniciais, corBanda, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
+import type { PontoTrajeto } from '@/app/components/MapaTrajeto';
 
-type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'masterdrive';
+const MapaTrajeto = dynamic(() => import('@/app/components/MapaTrajeto'), {
+  ssr: false,
+  loading: () => <div style={{ height: 420, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mute)', fontSize: 12.5 }}>Carregando mapa…</div>,
+});
+
+type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'mapa' | 'masterdrive';
 type Role = 'gestor' | 'master';
 
 interface LeituraApi {
@@ -52,6 +59,7 @@ interface DetalheData {
   penultimaLeitura: LeituraComNota | null;
   periodo: { inicio: string; fim: string };
   resultadoPeriodo: ResultadoPeriodo | null;
+  pontosTrajeto: PontoTrajeto[];
   ranking: Array<{ placa: string; nome: string | null; nota: number | null; faixa: string | null }>;
   atendimentos: Array<{ id: string; resumo: string; resultado: string; indicador_mnemonico: string | null; criado_em: string }>;
   papelUsuario: string;
@@ -352,6 +360,7 @@ export default function MotoristaDetalhe() {
             <button role="tab" aria-selected={tab === 'resumo'} onClick={() => setTab('resumo')}>Resumo</button>
             <button role="tab" aria-selected={tab === 'indicadores'} onClick={() => setTab('indicadores')}>Indicadores</button>
             <button role="tab" aria-selected={tab === 'evolucao'} onClick={() => setTab('evolucao')}>Evolução</button>
+            <button role="tab" aria-selected={tab === 'mapa'} onClick={() => setTab('mapa')}>Mapa</button>
             <button role="tab" aria-selected={tab === 'masterdrive'} onClick={() => setTab('masterdrive')}>Master Drive</button>
           </div>
 
@@ -737,6 +746,26 @@ export default function MotoristaDetalhe() {
                     <div><div className="i">Evento no pacote</div><div className="o" style={{ fontSize: 12, fontFamily: 'var(--sans)' }}>{leituraDetalheAtual.leitura.eventoBruto || '—'}</div></div>
                   </div>
                 ) : <p className="sub" style={{ fontSize: 12.5 }}>Selecione uma leitura na lista ao lado.</p>}
+              </div>
+            </div>
+          )}
+
+          {tab === 'mapa' && (
+            <div className="painel show">
+              <div className="card">
+                <h3>🗺️ TRAJETO NO PERÍODO <span className="tag">{dados.pontosTrajeto.length} ponto(s) com GPS válido</span></h3>
+                <p className="sub" style={{ fontSize: 12.5, marginBottom: 14 }}>
+                  {new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')} · pontos conectados na ordem cronológica das leituras reais de telemetria — sem interpolação de rota entre eles.
+                </p>
+                <MapaTrajeto pontos={dados.pontosTrajeto} />
+                <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 11.5, color: 'var(--sub)', flexWrap: 'wrap' }}>
+                  <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#3f9d5d', marginRight: 5 }}></span>Início do trajeto</span>
+                  <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#d1493c', marginRight: 5 }}></span>Fim do trajeto</span>
+                  <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#d9932f', marginRight: 5 }}></span>Ponto intermediário (cor pela velocidade)</span>
+                </div>
+                <p className="mute" style={{ fontSize: 11, marginTop: 10 }}>
+                  Clique em um ponto para ver data/hora, velocidade e rotação registradas. Coordenadas fora do intervalo válido (bug conhecido de escala em ~4% dos pacotes) já foram filtradas antes de chegar aqui.
+                </p>
               </div>
             </div>
           )}

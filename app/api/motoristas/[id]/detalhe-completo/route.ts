@@ -6,6 +6,7 @@ import { calcularNotaFinal, ResultadoApuracao } from '@/lib/motor-apuracao';
 export const dynamic = 'force-dynamic';
 
 const LIMITE_LEITURAS_DETALHE = 100;
+const LIMITE_PONTOS_MAPA = 1000;
 
 export async function GET(
   request: NextRequest,
@@ -44,6 +45,7 @@ export async function GET(
       { data: alocacao },
       { data: versaoVigente },
       { data: leiturasRaw },
+      { data: pontosTrajetoRaw },
       { data: agregadoPeriodo },
       { data: agregadosFrota },
       { data: atendimentos },
@@ -52,6 +54,16 @@ export async function GET(
       supabaseServer.from('alocacoes_motorista_veiculo').select('veiculo_id').eq('motorista_id', resolvedParams.id).is('fim', null).order('inicio', { ascending: false }).limit(1).maybeSingle(),
       supabaseServer.from('versoes_config').select('id, nome').eq('empresa_id', usuario.empresa_id).eq('vigente', true).maybeSingle(),
       supabaseServer.from('leituras_telemetria').select('*').eq('motorista_id', resolvedParams.id).order('timestamp_leitura', { ascending: false }).limit(LIMITE_LEITURAS_DETALHE),
+      supabaseServer
+        .from('leituras_telemetria')
+        .select('id, timestamp_leitura, latitude, longitude, velocidade_kmh, rpm')
+        .eq('motorista_id', resolvedParams.id)
+        .gte('timestamp_leitura', dataInicio)
+        .lte('timestamp_leitura', dataFim)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('timestamp_leitura', { ascending: true })
+        .limit(LIMITE_PONTOS_MAPA),
       supabaseServer.rpc('apurar_periodo_motorista', { p_motorista_id: resolvedParams.id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
       supabaseServer.rpc('apurar_periodo_frota', { p_empresa_id: usuario.empresa_id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
       supabaseServer.from('atendimentos_master_drive').select('*').eq('motorista_id', resolvedParams.id).order('criado_em', { ascending: false }).limit(10),
@@ -184,6 +196,15 @@ export async function GET(
       cpf = motorista.cpf.replace(/(\d{3})\.?\d{3}\.?\d{3}-?(\d{2})/, '$1.***.**$2');
     }
 
+    const pontosTrajeto = (pontosTrajetoRaw || []).map((p: any) => ({
+      id: p.id,
+      dataHoraISO: p.timestamp_leitura,
+      lat: p.latitude,
+      lon: p.longitude,
+      velocidadeKmh: p.velocidade_kmh,
+      rpm: p.rpm,
+    }));
+
     return NextResponse.json({
       sucesso: true,
       dados: {
@@ -198,6 +219,7 @@ export async function GET(
         penultimaLeitura,
         periodo: { inicio: dataInicio, fim: dataFim },
         resultadoPeriodo,
+        pontosTrajeto,
         ranking,
         atendimentos: atendimentos || [],
         papelUsuario: usuario.papel,
