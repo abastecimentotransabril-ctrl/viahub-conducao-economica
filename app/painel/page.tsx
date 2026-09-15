@@ -188,6 +188,7 @@ export default function PainelVisaoGeral() {
               </div>
 
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="tbox">
                 <table>
                   <thead>
                     <tr>
@@ -234,6 +235,7 @@ export default function PainelVisaoGeral() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {filtrados.length === 0 && (

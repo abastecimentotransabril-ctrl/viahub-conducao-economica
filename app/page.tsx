@@ -111,6 +111,7 @@ export default function Dashboard() {
           )}
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="tbox">
             <table>
               <thead>
                 <tr>
@@ -151,6 +152,7 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {filtrados.length === 0 && !error && (
