@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
 import DateRangePicker from '@/app/components/DateRangePicker';
@@ -241,7 +242,10 @@ export default function MotoristaDetalhe() {
 
       <main>
         <div className="topbar">
-          <span className="trilha">‹ &nbsp;Motoristas &nbsp;›&nbsp; <b>{motorista.nome}</b></span>
+          <span className="trilha">
+            <Link href="/" style={{ color: 'var(--sub)', textDecoration: 'none' }}>‹ Motoristas</Link>
+            &nbsp;›&nbsp; <b>{motorista.nome}</b>
+          </span>
           <span className="spacer"></span>
           <DateRangePicker
             inicio={new Date(dataInicio + 'T00:00:00')}
