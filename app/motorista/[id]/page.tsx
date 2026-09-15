@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
-import { nf, sinal, iniciais, corBanda, corFaixaNota, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
+import { nf, sinal, iniciais, corBanda, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
 
 type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'masterdrive';
 type Role = 'gestor' | 'master';
@@ -176,31 +176,32 @@ export default function MotoristaDetalhe() {
 
   const rankOrdenado = [...ranking].sort((a, b) => (b.nota || 0) - (a.nota || 0));
   const meuIndex = veiculo ? rankOrdenado.findIndex((r) => r.placa === veiculo.placa) : -1;
-  const inicioJanela = Math.max(0, meuIndex - 1);
-  const fimJanela = Math.min(rankOrdenado.length, meuIndex + 2);
-  const janelaRanking = meuIndex >= 0 ? rankOrdenado.slice(inicioJanela, fimJanela) : rankOrdenado.slice(0, 3);
-
-  const contagemFaixas: Record<string, number> = { Ouro: 0, Prata: 0, Bronze: 0, 'Sem premiação': 0 };
-  rankOrdenado.forEach((r) => {
-    if (r.nota === null) return;
-    if (r.nota >= 90) contagemFaixas['Ouro']++;
-    else if (r.nota >= 80) contagemFaixas['Prata']++;
-    else if (r.nota >= 70) contagemFaixas['Bronze']++;
-    else contagemFaixas['Sem premiação']++;
-  });
 
   const pressaoValor = ultimaLeitura?.leitura.indicadoresBrutos?.throttleAgregation ?? null;
   const pressaoFaixa = pressaoValor !== null ? classificarPressao(pressaoValor) : null;
   const corFaixaPressao = faixasClassificacao.find((f) => f.rotulo === pressaoFaixa)?.cor || '#a39d8c';
 
-  const distanciaPercorrida =
-    ultimaLeitura?.leitura.odometroKm != null && penultimaLeitura?.leitura.odometroKm != null
-      ? ultimaLeitura.leitura.odometroKm - penultimaLeitura.leitura.odometroKm
-      : null;
-  const intervaloMin =
-    ultimaLeitura && penultimaLeitura
-      ? Math.round((ultimaLeitura.leitura.timestampUnix - penultimaLeitura.leitura.timestampUnix) / 60)
-      : null;
+  // Desempenho no período (dados reais, agregados de todas as leituras do período)
+  let distanciaPercorridaPeriodo: number | null = null;
+  const odometros = leiturasComNota.map((l) => l.leitura.odometroKm).filter((v): v is number => v != null);
+  if (odometros.length >= 2) {
+    distanciaPercorridaPeriodo = Math.max(...odometros) - Math.min(...odometros);
+  }
+  const velocidades = leiturasComNota.map((l) => l.leitura.velocidadeKmh).filter((v): v is number => v != null);
+  const velocidadeMediaPeriodo = velocidades.length > 0 ? velocidades.reduce((a, b) => a + b, 0) / velocidades.length : null;
+
+  // Distribuição das notas — das leituras individuais deste motorista no período (não da frota)
+  const bandasProprias = { Verde: 0, Amarelo: 0, Laranja: 0, Vermelho: 0 } as Record<string, number>;
+  leiturasComNota.forEach((l) => {
+    const n = l.resultado?.nota_final;
+    if (n == null) return;
+    if (n >= 85) bandasProprias['Verde']++;
+    else if (n >= 70) bandasProprias['Amarelo']++;
+    else if (n >= 60) bandasProprias['Laranja']++;
+    else bandasProprias['Vermelho']++;
+  });
+  const totalBandasProprias = Object.values(bandasProprias).reduce((a, b) => a + b, 0);
+  const corBandaLegenda: Record<string, string> = { Verde: '#3f9d5d', Amarelo: '#d9932f', Laranja: '#e0793f', Vermelho: '#d1493c' };
 
   let diagPior: { nome: string; contrib: number } | null = null;
   let diagMaior: { nome: string; gap: number } | null = null;
@@ -273,18 +274,21 @@ export default function MotoristaDetalhe() {
           <div className="hdr">
             <div className="hdr-card">
               <div className="hdr-top">
-                <div className="avatar">{iniciais(motorista.nome)}</div>
+                <div className="mh-avatar">{iniciais(motorista.nome)}</div>
                 <div className="hdr-name">
-                  <span className="status"><i></i>{ultimaLeitura?.leitura.operationalLabel || 'Status desconhecido'}</span>
+                  <span className="mh-status-pill"><i></i>{ultimaLeitura?.leitura.operationalLabel || 'Status desconhecido'}</span>
                   <h1>{motorista.nome}</h1>
                   <div className="role-txt">Motorista {motorista.matricula ? <>· matrícula <span className="n">{motorista.matricula}</span></> : ''}</div>
                 </div>
               </div>
-              <div className="hdr-meta">
-                <span>🚛 {veiculo?.modelo_equipamento || '—'}</span>
+              <div className="mh-meta-row">
+                <span>🚛 <b>{veiculo?.modelo_equipamento || '—'}</b></span>
                 <span>Placa <b>{veiculo?.placa || '—'}</b></span>
                 <span>CPF <b>{motorista.cpf || '—'}</b></span>
-                <span>Transabril <span className="tag">unidade a nomear no cadastro</span></span>
+                <span>🏢 <b>Transabril</b> <span className="tag">unidade a nomear no cadastro</span></span>
+                {ultimaLeitura?.leitura.posicao ? (
+                  <span>📍 último ponto: <b>{new Date(ultimaLeitura.leitura.dataHoraISO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</b></span>
+                ) : null}
               </div>
               <p className="hdr-note">
                 Configuração vigente: <b style={{ color: 'var(--ink)' }}>{dados.configVigente?.nome || 'nenhuma configuração ativa'}</b> · Cálculo acumulado de {new Date(dataInicio).toLocaleDateString('pt-BR')} a {new Date(dataFim).toLocaleDateString('pt-BR')}, com {atual?.qtdLeituras ?? 0} leitura(s) real(is) de telemetria.
@@ -377,63 +381,86 @@ export default function MotoristaDetalhe() {
 
                 <div className="card">
                   <h3>🌱 INDICADORES DE BOA CONDUÇÃO <span className="link-mais" style={{ cursor: 'pointer' }} onClick={() => setTab('indicadores')}>Ver detalhes →</span></h3>
-                  <div className="rings">
+                  <div className="rings-v2">
                     {pontuaIndicadores.map((ind) => {
                       const da = atual?.detalhe.find((d) => d.indicador === ind.mnemonico);
                       const dp = tendenciaAnterior?.detalhe.find((d) => d.indicador === ind.mnemonico);
                       if (!ind.campo_fonte) {
                         return (
-                          <div className="ring-item ring-pend" key={ind.id}>
-                            <div className="ring-mini" style={{ position: 'relative' }}>
+                          <div className="ring-card pend" key={ind.id}>
+                            <div className="rc-svg">
                               <RingSvg valor={0} cor="#d7d2c4" />
-                              <span className="v mute" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>—</span>
+                              <span className="rc-val mute">—</span>
                             </div>
-                            <div className="nm">{ind.nome}</div>
-                            <div className="meta tag" style={{ display: 'inline-block', marginTop: 2 }}>peso {ind.peso} · pendente</div>
+                            <div className="rc-label">{ind.nome}</div>
+                            <div className="rc-meta">peso {ind.peso}% · pendente</div>
                           </div>
                         );
                       }
                       return (
-                        <div className="ring-item" key={ind.id}>
-                          <div className="ring-mini" style={{ position: 'relative' }}>
+                        <div className="ring-card" key={ind.id}>
+                          <div className="rc-svg">
                             <RingSvg valor={da?.nota ?? null} />
-                            <span className="v" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: corBanda(da?.nota ?? null) }}>
+                            <span className="rc-val" style={{ color: corBanda(da?.nota ?? null) }}>
                               {nf(da?.nota ?? null, 0)}%
                             </span>
                           </div>
-                          <div className="nm">{ind.nome}</div>
-                          <div className="meta">meta ≥ {ind.nota100}%</div>
-                          <div className="spark-mini"><SparkMini v1={dp?.nota ?? null} v2={da?.nota ?? null} /></div>
-                          <div className="src">fonte: nota do equipamento</div>
+                          <div className="rc-label">{ind.nome}</div>
+                          <div className="rc-meta">Meta ≥ {ind.nota100}%</div>
+                          <div className="rc-spark"><SparkMini v1={dp?.nota ?? null} v2={da?.nota ?? null} /></div>
                         </div>
                       );
                     })}
+                    {classificaIndicador && (
+                      <div className="ring-card" key={classificaIndicador.id}>
+                        <div className="rc-svg">
+                          <RingSvg valor={pressaoValor !== null ? 100 - pressaoValor : null} cor={corFaixaPressao} />
+                          <span className="rc-val" style={{ color: corFaixaPressao }}>
+                            {nf(pressaoValor, 0)}%
+                          </span>
+                        </div>
+                        <div className="rc-label">{classificaIndicador.nome}</div>
+                        <div className="rc-meta">Meta ≤ 60%</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="g3" style={{ marginBottom: 16 }}>
                 <div className="card">
-                  <h3>🏁 POSIÇÃO NA FROTA</h3>
-                  {janelaRanking.length === 0 ? (
-                    <p className="sub" style={{ fontSize: 12.5 }}>Sem ranking disponível ainda — nenhuma leitura recente elegível encontrada para a frota.</p>
+                  <h3>🏆 MASTER DRIVE <span className="tag">ranking do período</span></h3>
+                  {rankOrdenado.length === 0 ? (
+                    <p className="sub" style={{ fontSize: 12.5 }}>Sem ranking disponível ainda no período selecionado.</p>
                   ) : (
                     <>
-                      {janelaRanking.map((r) => {
-                        const posReal = rankOrdenado.findIndex((x) => x.placa === r.placa) + 1;
-                        const souEu = veiculo && r.placa === veiculo.placa;
-                        return (
-                          <div className={`rank-row${souEu ? ' me' : ''}`} key={r.placa}>
-                            <span className="pos">{posReal}º</span>
-                            <span className="av">{iniciais(r.nome || r.placa)}</span>
-                            <span className="nm">{r.nome || r.placa}</span>
-                            <span className="val">{nf(r.nota, 1)}</span>
-                          </div>
-                        );
-                      })}
-                      <div className="rank-foot">
-                        {meuIndex >= 0 ? `${meuIndex + 1}º de ${rankOrdenado.length} motoristas elegíveis na apuração vigente.` : `${rankOrdenado.length} motoristas elegíveis na apuração vigente.`} Ranking calculado com os mesmos pesos desta tela, sobre a leitura mais recente de cada motorista.
+                      <p className="sub" style={{ fontSize: 12.5, marginBottom: 10 }}>
+                        {meuIndex >= 0 ? <>Você está em <b style={{ color: 'var(--ink)' }}>{meuIndex + 1}º</b> de {rankOrdenado.length} motoristas</> : `${rankOrdenado.length} motoristas elegíveis no período`}
+                      </p>
+                      <div className="podio-wrap">
+                        {[1, 0, 2].map((idx) => {
+                          const r = rankOrdenado[idx];
+                          if (!r) return <div key={idx} style={{ flex: 1 }} />;
+                          const posicao = idx + 1;
+                          const souEu = veiculo && r.placa === veiculo.placa;
+                          return (
+                            <div className={`podio-item pos${posicao}${souEu ? ' me' : ''}`} key={r.placa}>
+                              <div className="podio-av">{iniciais(r.nome || r.placa)}</div>
+                              <div className="podio-nm">{r.nome || r.placa}</div>
+                              <div className="podio-bar">{nf(r.nota, 1)}</div>
+                              <div className="podio-pos">{posicao}º</div>
+                            </div>
+                          );
+                        })}
                       </div>
+                      {meuIndex >= 3 && (
+                        <div className="rank-row me" style={{ marginTop: 8 }}>
+                          <span className="pos">{meuIndex + 1}º</span>
+                          <span className="av">{iniciais(motorista.nome)}</span>
+                          <span className="nm">{motorista.nome} (você)</span>
+                          <span className="val">{nf(rankOrdenado[meuIndex]?.nota ?? null, 1)}</span>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -441,41 +468,59 @@ export default function MotoristaDetalhe() {
                   <h3>EVOLUÇÃO DA NOTA <span className="link-mais" style={{ cursor: 'pointer' }} onClick={() => setTab('evolucao')}>ver aba →</span></h3>
                   <div style={{ height: 90 }}>
                     <SparkGrande
-                      valores={leiturasComNota.slice(-2).map((l) => l.resultado?.nota_final ?? null)}
-                      labels={leiturasComNota.slice(-2).map((l) => new Date(l.leitura.dataHoraISO).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}
+                      valores={leiturasComNota.slice(-8).map((l) => l.resultado?.nota_final ?? null)}
+                      labels={leiturasComNota.slice(-8).map((l) => new Date(l.leitura.dataHoraISO).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))}
                       w={260} h={90}
                     />
                   </div>
-                  <div className="evo-note">{leiturasComNota.length} leitura(s) disponível(is) neste motorista.</div>
+                  <div className="evo-note">{leiturasComNota.length} leitura(s) disponível(is) neste motorista no período.</div>
                 </div>
                 <div className="card">
-                  <h3>DISTRIBUIÇÃO DA FROTA POR FAIXA</h3>
-                  <div className="donut-wrap">
-                    <div><DonutFrota contagem={contagemFaixas} total={rankOrdenado.length} /></div>
-                    <div className="donut-legend">
-                      {Object.entries(contagemFaixas).map(([k, v]) => (
-                        <div className="row" key={k}>
-                          <span className="dot" style={{ background: corFaixaNota(k) }}></span>
-                          <span className="lbl">{k}</span>
-                          <span className="pct n">{rankOrdenado.length > 0 ? Math.round((v / rankOrdenado.length) * 100) : 0}%</span>
-                        </div>
-                      ))}
+                  <h3>DISTRIBUIÇÃO DAS NOTAS <span className="tag">leituras deste motorista no período</span></h3>
+                  {totalBandasProprias === 0 ? (
+                    <p className="sub" style={{ fontSize: 12.5 }}>Sem leituras suficientes no período para distribuir.</p>
+                  ) : (
+                    <div className="dist-wrap">
+                      <div><DonutFrota contagem={bandasProprias} total={totalBandasProprias} /></div>
+                      <div className="donut-legend">
+                        {Object.entries(bandasProprias).map(([k, v]) => (
+                          <div className="row" key={k}>
+                            <span className="dot" style={{ background: corBandaLegenda[k] }}></span>
+                            <span className="lbl">{k} {k === 'Verde' ? '(≥85)' : k === 'Amarelo' ? '(70–84)' : k === 'Laranja' ? '(60–69)' : '(<60)'}</span>
+                            <span className="pct n">{totalBandasProprias > 0 ? Math.round((v / totalBandasProprias) * 100) : 0}%</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               <div className="g3">
                 <div className="card">
-                  <h3>📏 DESDE A LEITURA ANTERIOR</h3>
-                  {penultimaLeitura && ultimaLeitura ? (
-                    <div className="kv">
-                      <div><div className="i">Distância percorrida</div><div className="o">{nf(distanciaPercorrida, 1)} km</div></div>
-                      <div><div className="i">Velocidade observada</div><div className="o">{penultimaLeitura.leitura.velocidadeKmh}–{ultimaLeitura.leitura.velocidadeKmh} km/h<small>2 amostras instantâneas, não é média de viagem</small></div></div>
-                      <div><div className="i">Consumo</div><div className="o mute">indisponível<small>unidade do sensor pendente</small></div></div>
-                      <div><div className="i">Intervalo</div><div className="o">{intervaloMin} min</div></div>
+                  <h3>🚚 DESEMPENHO NO PERÍODO</h3>
+                  <div className="desemp-grid">
+                    <div className="desemp-item">
+                      <div className="ic">📏</div>
+                      <div className="val">{distanciaPercorridaPeriodo != null ? nf(distanciaPercorridaPeriodo, 0) : '—'}</div>
+                      <div className="lbl">km percorridos</div>
                     </div>
-                  ) : <p className="sub" style={{ fontSize: 12.5 }}>Apenas uma leitura disponível — sem comparação possível.</p>}
+                    <div className="desemp-item">
+                      <div className="ic">⚡</div>
+                      <div className="val">{velocidadeMediaPeriodo != null ? nf(velocidadeMediaPeriodo, 0) : '—'}</div>
+                      <div className="lbl">km/h média</div>
+                    </div>
+                    <div className="desemp-item">
+                      <div className="ic">⛽</div>
+                      <div className="val pend">pendente</div>
+                      <div className="lbl">consumo total<br /><small style={{ fontSize: 9.5 }}>unidade não confirmada</small></div>
+                    </div>
+                    <div className="desemp-item">
+                      <div className="ic">🌱</div>
+                      <div className="val pend">pendente</div>
+                      <div className="lbl">km/L média<br /><small style={{ fontSize: 9.5 }}>depende do consumo</small></div>
+                    </div>
+                  </div>
                 </div>
                 <div className="card">
                   <h3>📍 LEITURA MAIS RECENTE <span className="tag">sem tripID no pacote</span></h3>

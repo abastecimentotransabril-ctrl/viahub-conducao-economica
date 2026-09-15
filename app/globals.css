@@ -301,3 +301,46 @@ main{min-width:0}
   .g2,.g3{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== Redesign v2 — inspirado no layout de referência (NEXTRIP) ===== */
+
+/* Header do motorista v2 */
+.mh-avatar{width:76px;height:76px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:600;flex:0 0 auto;border:3px solid var(--card);box-shadow:0 0 0 2px var(--pista)}
+.mh-status-pill{display:inline-flex;align-items:center;gap:6px;background:var(--pista-fx);color:var(--pista);font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:999px;margin-bottom:6px}
+.mh-status-pill i{width:6px;height:6px;border-radius:50%;background:var(--pista);display:inline-block}
+.mh-meta-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;color:var(--sub);margin-top:8px}
+.mh-meta-row b{color:var(--ink);font-weight:500}
+
+/* Rings v2 — cartão branco individual por indicador */
+.rings-v2{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px}
+.ring-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ring-card.pend{border-style:dashed;opacity:.85}
+.ring-card .rc-svg{position:relative;width:74px;height:74px}
+.ring-card .rc-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:600}
+.ring-card .rc-label{font-size:11.5px;font-weight:500;margin-top:2px;line-height:1.3}
+.ring-card .rc-meta{font-size:10px;color:var(--mute)}
+.ring-card .rc-spark{margin-top:2px}
+
+/* Pódio Master Drive */
+.podio-wrap{display:flex;align-items:flex-end;gap:10px;justify-content:center;padding:10px 0}
+.podio-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.podio-av{width:40px;height:40px;border-radius:50%;background:var(--bg);border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--sub)}
+.podio-item.pos1 .podio-av{border-color:#d99a3f;color:#d99a3f;width:48px;height:48px;font-size:15px}
+.podio-item.me .podio-av{border-color:var(--sinal);color:var(--sinal)}
+.podio-bar{width:100%;border-radius:6px 6px 0 0;background:var(--line);display:flex;align-items:flex-start;justify-content:center;padding-top:6px;font-family:var(--mono);font-size:11px;color:var(--sub)}
+.podio-item.pos1 .podio-bar{height:64px;background:#faf1e0;color:#c08128}
+.podio-item.pos2 .podio-bar{height:46px}
+.podio-item.pos3 .podio-bar{height:34px}
+.podio-nm{font-size:10.5px;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podio-pos{font-size:9px;color:var(--mute)}
+
+/* Cards de desempenho no período */
+.desemp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px}
+.desemp-item{text-align:center;padding:6px 4px}
+.desemp-item .ic{font-size:18px;margin-bottom:6px}
+.desemp-item .val{font-family:var(--mono);font-size:17px;font-weight:600}
+.desemp-item .val.pend{color:var(--mute);font-size:13px}
+.desemp-item .lbl{font-size:11px;color:var(--sub);margin-top:2px}
+
+/* Distribuição das leituras por banda (donut do motorista) */
+.dist-wrap{display:flex;align-items:center;gap:18px}
