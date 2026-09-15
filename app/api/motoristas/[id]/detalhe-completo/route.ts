@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const LIMITE_LEITURAS_DETALHE = 100;
 const LIMITE_PONTOS_MAPA = 1000;
+const LIMITE_LEITURAS_PERIODO = 2000;
 
 export async function GET(
   request: NextRequest,
@@ -46,6 +47,7 @@ export async function GET(
       { data: versaoVigente },
       { data: leiturasRaw },
       { data: pontosTrajetoRaw },
+      { data: leiturasPeriodoRaw },
       { data: agregadoPeriodo },
       { data: agregadosFrota },
       { data: atendimentos },
@@ -64,6 +66,16 @@ export async function GET(
         .not('longitude', 'is', null)
         .order('timestamp_leitura', { ascending: true })
         .limit(LIMITE_PONTOS_MAPA),
+      // Todas as leituras REAIS do período exato selecionado (não as 100
+      // mais recentes globais) — usadas para o detalhamento hora a hora.
+      supabaseServer
+        .from('leituras_telemetria')
+        .select('id, timestamp_leitura, velocidade_kmh, rpm, indicadores_brutos')
+        .eq('motorista_id', resolvedParams.id)
+        .gte('timestamp_leitura', dataInicio)
+        .lte('timestamp_leitura', dataFim)
+        .order('timestamp_leitura', { ascending: true })
+        .limit(LIMITE_LEITURAS_PERIODO),
       supabaseServer.rpc('apurar_periodo_motorista', { p_motorista_id: resolvedParams.id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
       supabaseServer.rpc('apurar_periodo_frota', { p_empresa_id: usuario.empresa_id, p_data_inicio: dataInicio, p_data_fim: dataFim }),
       supabaseServer.from('atendimentos_master_drive').select('*').eq('motorista_id', resolvedParams.id).order('criado_em', { ascending: false }).limit(10),
@@ -118,6 +130,44 @@ export async function GET(
         regras
       );
     };
+
+    // Leituras REAIS do período exato selecionado (não as 100 mais
+    // recentes globais) — cada uma com sua nota momentânea calculada.
+    const leiturasPeriodoComNota = (leiturasPeriodoRaw || []).map((l: any) => ({
+      id: l.id,
+      dataHoraISO: l.timestamp_leitura,
+      velocidadeKmh: l.velocidade_kmh,
+      rpm: l.rpm,
+      resultado: calcular(l.indicadores_brutos),
+    }));
+
+    // Agrupamento por hora do dia (00h-23h) — só entram os blocos que
+    // realmente têm leitura; nunca preenchemos hora sem dado.
+    const blocosPorHora = new Map<string, { horaInicio: string; leituras: typeof leiturasPeriodoComNota }>();
+    for (const l of leiturasPeriodoComNota) {
+      const d = new Date(l.dataHoraISO);
+      const chave = `${d.toISOString().slice(0, 10)}T${String(d.getHours()).padStart(2, '0')}`;
+      if (!blocosPorHora.has(chave)) {
+        blocosPorHora.set(chave, { horaInicio: chave, leituras: [] });
+      }
+      blocosPorHora.get(chave)!.leituras.push(l);
+    }
+    const detalhamentoPorHora = Array.from(blocosPorHora.values())
+      .map((bloco) => {
+        const comNota = bloco.leituras.filter((l) => l.resultado?.nota_final != null);
+        const notaMedia = comNota.length > 0
+          ? comNota.reduce((s, l) => s + (l.resultado!.nota_final as number), 0) / comNota.length
+          : null;
+        return {
+          horaInicio: bloco.horaInicio,
+          qtdLeituras: bloco.leituras.length,
+          notaMedia,
+          velocidadeMedia: bloco.leituras.filter((l) => l.velocidadeKmh != null).length > 0
+            ? bloco.leituras.reduce((s, l) => s + (l.velocidadeKmh || 0), 0) / bloco.leituras.filter((l) => l.velocidadeKmh != null).length
+            : null,
+        };
+      })
+      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
 
     const leituras = (leiturasRaw || [])
       .slice()
@@ -227,6 +277,8 @@ export async function GET(
         periodo: { inicio: dataInicio, fim: dataFim },
         resultadoPeriodo,
         pontosTrajeto,
+        leiturasPeriodoComNota,
+        detalhamentoPorHora,
         ranking,
         atendimentos: atendimentos || [],
         papelUsuario: usuario.papel,

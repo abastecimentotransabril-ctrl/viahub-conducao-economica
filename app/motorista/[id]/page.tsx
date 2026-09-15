@@ -43,6 +43,13 @@ interface ResultadoPeriodo extends ResultadoApi {
   ultimaLeituraPeriodo: string | null;
 }
 
+interface DetalheHora {
+  horaInicio: string;
+  qtdLeituras: number;
+  notaMedia: number | null;
+  velocidadeMedia: number | null;
+}
+
 interface DetalheData {
   motorista: { id: string; nome: string; cpf: string | null; matricula: string | null; ativo: boolean };
   veiculo: { placa: string; modelo_equipamento: string; capacidade: string } | null;
@@ -59,6 +66,7 @@ interface DetalheData {
   periodo: { inicio: string; fim: string };
   resultadoPeriodo: ResultadoPeriodo | null;
   pontosTrajeto: PontoTrajeto[];
+  detalhamentoPorHora: DetalheHora[];
   ranking: Array<{ placa: string; nome: string | null; nota: number | null; faixa: string | null }>;
   atendimentos: Array<{ id: string; resumo: string; resultado: string; indicador_mnemonico: string | null; criado_em: string }>;
   papelUsuario: string;
@@ -742,6 +750,44 @@ export default function MotoristaDetalhe() {
                     <div><div className="i">Evento no pacote</div><div className="o" style={{ fontSize: 12, fontFamily: 'var(--sans)' }}>{leituraDetalheAtual.leitura.eventoBruto || '—'}</div></div>
                   </div>
                 ) : <p className="sub" style={{ fontSize: 12.5 }}>Selecione uma leitura na lista ao lado.</p>}
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <h3>🕐 DETALHAMENTO POR HORA <span className="tag">{new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')}</span></h3>
+                {dados.detalhamentoPorHora.length === 0 ? (
+                  <p className="sub" style={{ fontSize: 12.5 }}>Nenhuma leitura real no período selecionado para detalhar por hora.</p>
+                ) : (
+                  <>
+                    <div className="tbox">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Dia / Hora</th>
+                            <th className="num">Leituras</th>
+                            <th className="num">Nota média</th>
+                            <th className="num">Velocidade média</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dados.detalhamentoPorHora.map((b) => {
+                            const [dia, hora] = b.horaInicio.split('T');
+                            return (
+                              <tr key={b.horaInicio}>
+                                <td className="n">{new Date(dia + 'T00:00:00').toLocaleDateString('pt-BR')} — {hora}h</td>
+                                <td className="num n">{b.qtdLeituras}</td>
+                                <td className="num n" style={{ color: corBanda(b.notaMedia), fontWeight: 500 }}>{nf(b.notaMedia, 1)}</td>
+                                <td className="num n">{b.velocidadeMedia != null ? `${nf(b.velocidadeMedia, 0)} km/h` : '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mute" style={{ fontSize: 11, marginTop: 10 }}>
+                      Só aparecem aqui as horas em que o equipamento realmente enviou telemetria — a Maxtrack não transmite em intervalo fixo, então horas sem leitura simplesmente não têm linha (não preenchemos com dado inventado).
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
