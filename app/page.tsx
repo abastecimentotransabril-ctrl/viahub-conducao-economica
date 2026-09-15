@@ -13,6 +13,7 @@ interface Motorista {
   matricula: string | null;
   cpf: string | null;
   ativo: boolean;
+  placa: string | null;
 }
 
 export default function Dashboard() {
@@ -60,7 +61,10 @@ export default function Dashboard() {
     return <div style={{ padding: '20px' }}>Carregando...</div>;
   }
 
-  const filtrados = motoristas.filter((m) => m.nome.toLowerCase().includes(busca.toLowerCase()));
+  const filtrados = motoristas.filter((m) =>
+    m.nome.toLowerCase().includes(busca.toLowerCase()) ||
+    (m.placa || '').toLowerCase().includes(busca.toLowerCase())
+  );
 
   return (
     <div className={`shell${collapsed ? ' collapsed' : ''}`}>
@@ -83,7 +87,7 @@ export default function Dashboard() {
               </p>
             </div>
             <input
-              placeholder="Buscar por nome…"
+              placeholder="Buscar por nome ou placa…"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               style={{ maxWidth: 260 }}
@@ -102,6 +106,7 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th style={{ padding: '12px 16px' }}>Motorista</th>
+                  <th>Placa</th>
                   <th>Matrícula</th>
                   <th>Status</th>
                   <th></th>
@@ -125,6 +130,7 @@ export default function Dashboard() {
                         <span style={{ fontWeight: 500 }}>{motorista.nome}</span>
                       </div>
                     </td>
+                    <td className="n">{motorista.placa || '—'}</td>
                     <td className="n">{motorista.matricula || '—'}</td>
                     <td>
                       {motorista.ativo ? (

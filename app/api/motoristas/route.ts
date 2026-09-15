@@ -32,11 +32,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Listar motoristas da empresa
-    const { data: motoristas, error } = await supabaseServer
-      .from('motoristas')
-      .select('id, nome, cpf, matricula, ativo')
-      .eq('empresa_id', usuario.empresa_id)
-      .order('nome');
+    const [{ data: motoristas, error }, { data: placasAtuais }] = await Promise.all([
+      supabaseServer
+        .from('motoristas')
+        .select('id, nome, cpf, matricula, ativo')
+        .eq('empresa_id', usuario.empresa_id)
+        .order('nome'),
+      supabaseServer.rpc('motoristas_com_placa_atual', { p_empresa_id: usuario.empresa_id }),
+    ]);
 
     if (error) {
       return NextResponse.json(
@@ -45,13 +48,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const placaPorMotorista = new Map((placasAtuais || []).map((p: any) => [p.motorista_id, p]));
+
     // Mascarar CPF para papéis que não são RH/admin
     const motoristasPublicos = motoristas.map(m => {
+      const veiculoAtual = placaPorMotorista.get(m.id) as any;
+      const base = {
+        ...m,
+        placa: veiculoAtual?.placa || null,
+        modelo_equipamento: veiculoAtual?.modelo_equipamento || null,
+      };
       if (usuario.papel === 'rh' || usuario.papel === 'admin_gamificacao') {
-        return m;
+        return base;
       }
       return {
-        ...m,
+        ...base,
         cpf: m.cpf ? m.cpf.replace(/(\d{3})\.?\d{3}\.?\d{3}-?(\d{2})/, '$1.***.**$2') : null,
       };
     });

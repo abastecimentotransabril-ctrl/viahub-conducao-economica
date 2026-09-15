@@ -9,6 +9,7 @@ interface MotoristaResumo {
   nome: string;
   matricula: string | null;
   ativo: boolean;
+  placa: string | null;
 }
 
 interface MotoristaSelectorProps {
@@ -57,7 +58,10 @@ export default function MotoristaSelector({ motoristaAtualId, nome, placa, cpf, 
     router.push(`/motorista/${id}?inicio=${dataInicio}&fim=${dataFim}`);
   }
 
-  const filtrados = (motoristas || []).filter((m) => m.nome.toLowerCase().includes(busca.toLowerCase()));
+  const filtrados = (motoristas || []).filter((m) =>
+    m.nome.toLowerCase().includes(busca.toLowerCase()) ||
+    (m.placa || '').toLowerCase().includes(busca.toLowerCase())
+  );
 
   return (
     <div className="drp-wrap" ref={ref}>
@@ -74,7 +78,7 @@ export default function MotoristaSelector({ motoristaAtualId, nome, placa, cpf, 
         <div className="veic-sel-popover">
           <input
             autoFocus
-            placeholder="Buscar motorista…"
+            placeholder="Buscar por nome ou placa…"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             style={{ margin: '10px 10px 6px' }}
@@ -89,7 +93,12 @@ export default function MotoristaSelector({ motoristaAtualId, nome, placa, cpf, 
                 className={`veic-sel-item${m.id === motoristaAtualId ? ' atual' : ''}`}
                 onClick={() => selecionar(m.id)}
               >
-                <span>{m.nome}</span>
+                <span>
+                  {m.nome}
+                  <span style={{ display: 'block', fontSize: 10.5, color: 'var(--mute)', fontWeight: 400 }}>
+                    Placa {m.placa || '—'}
+                  </span>
+                </span>
                 {m.id === motoristaAtualId && <span className="tag">atual</span>}
               </button>
             ))}

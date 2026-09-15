@@ -78,6 +78,13 @@ export async function GET(
     const veiculoIdsFrota = Array.from(new Set((agregadosFrota || []).map((a: any) => a.veiculo_id)));
     const motoristaIdsFrota = Array.from(new Set((agregadosFrota || []).map((a: any) => a.motorista_id).filter(Boolean)));
 
+    // Preferir a alocação explícita (se existir); na falta dela — caso comum
+    // para os motoristas reais, cujo vínculo é feito por CPF no pacote da
+    // Maxtrack, não por alocação fixa — usar o veículo da leitura mais
+    // recente desse motorista (leiturasRaw já vem ordenada da mais nova
+    // para a mais antiga).
+    const veiculoIdResolvido = alocacao?.veiculo_id || (leiturasRaw && leiturasRaw[0]?.veiculo_id) || null;
+
     const [
       { data: veiculo },
       { data: indicadores },
@@ -87,8 +94,8 @@ export async function GET(
       { data: veiculosInfo },
       { data: motoristasInfo },
     ] = await Promise.all([
-      alocacao?.veiculo_id
-        ? supabaseServer.from('veiculos').select('*').eq('id', alocacao.veiculo_id).single()
+      veiculoIdResolvido
+        ? supabaseServer.from('veiculos').select('*').eq('id', veiculoIdResolvido).single()
         : Promise.resolve({ data: null }),
       versaoVigente ? supabaseServer.from('indicadores').select('*').eq('versao_config_id', versaoVigente.id) : Promise.resolve({ data: [] as any[] }),
       versaoVigente ? supabaseServer.from('faixas_nota').select('*').eq('versao_config_id', versaoVigente.id) : Promise.resolve({ data: [] as any[] }),
