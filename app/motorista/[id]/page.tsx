@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import { classificarPressao } from '@/lib/motor-apuracao';
 import DateRangePicker from '@/app/components/DateRangePicker';
+import Sidebar from '@/app/components/Sidebar';
+import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
 import { nf, sinal, iniciais, corBanda, RingSvg, SparkMini, SparkGrande, DonutFrota } from './render-helpers';
 
 type Tab = 'resumo' | 'indicadores' | 'evolucao' | 'masterdrive';
@@ -59,6 +60,7 @@ export default function MotoristaDetalhe() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const motoristaId = params.id as string;
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   const [dados, setDados] = useState<DetalheData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,24 +236,8 @@ export default function MotoristaDetalhe() {
   const faixaAtualObj = faixasNota.find((f) => f.rotulo === atual?.faixa_rotulo);
 
   return (
-    <div className="shell">
-      <aside>
-        <div className="brandmark">
-          <svg width="30" height="30" viewBox="0 0 30 30"><path d="M4 22 L14 6 L18 6 L10 22 Z" fill="#d99a3f" /><path d="M15 22 L23 8 L27 8 L19 22 Z" fill="#f2ede4" /></svg>
-          <div><div className="t">ViaHub</div><div className="s">TELEMETRIA &amp; PERFORMANCE</div></div>
-        </div>
-        <nav>
-          <Link href="/">Motoristas</Link>
-          <Link href="/painel">Visão Geral (Gamificação)</Link>
-          <a href="#">Indicadores</a>
-          <a href="#">Recálculo</a>
-          <a href="#">Master Drive</a>
-          <a href="#">Versões</a>
-          <a href="#">Diagnóstico</a>
-          <a href="#">Relatórios</a>
-        </nav>
-        <div className="side-foot">DADO CERTO, DECISÃO RÁPIDA</div>
-      </aside>
+    <div className={`shell${collapsed ? ' collapsed' : ''}`}>
+      <Sidebar collapsed={collapsed} onToggle={toggle} />
 
       <main>
         <div className="topbar">
