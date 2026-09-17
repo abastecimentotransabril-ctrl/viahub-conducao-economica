@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
 import Sidebar from '@/app/components/Sidebar';
+import DateRangePicker from '@/app/components/DateRangePicker';
 import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
+import { corParaFaixa } from '@/lib/motor-apuracao';
 
 interface Motorista {
   id: string;
@@ -17,11 +19,18 @@ interface Motorista {
   km_rodado: number | null;
   nota_geral: number | null;
   nota_geral_faixa: string | null;
+  nota_geral_cobertura_pct: number | null;
 }
 
 function formatarKm(km: number | null): string {
   if (km === null || km === undefined) return '—';
   return `${km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+}
+
+function hojeSemHora(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 export default function Dashboard() {
@@ -32,28 +41,25 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [exportando, setExportando] = useState(false);
+
+  const hoje = hojeSemHora();
+  const trintaDiasAtras = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const [periodoInicio, setPeriodoInicio] = useState<Date>(trintaDiasAtras);
+  const [periodoFim, setPeriodoFim] = useState<Date>(hoje);
 
   useEffect(() => {
     const verificarLogin = async () => {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
+
         if (authError || !user) {
           router.push('/auth/login');
           return;
         }
 
         setUsuario(user);
-
-        // Buscar motoristas
-        const response = await fetchAutenticado('/api/motoristas');
-        const json = await response.json();
-
-        if (json.sucesso) {
-          setMotoristas(json.dados);
-        } else {
-          setError(json.erro || 'Erro ao buscar motoristas');
-        }
+        await carregarMotoristas();
       } catch (erro) {
         setError('Erro ao carregar dashboard');
         console.error(erro);
@@ -63,7 +69,60 @@ export default function Dashboard() {
     };
 
     verificarLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!loading) carregarMotoristas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodoInicio, periodoFim]);
+
+  async function carregarMotoristas() {
+    try {
+      const inicioIso = new Date(periodoInicio).toISOString();
+      const fimIso = new Date(new Date(periodoFim).setHours(23, 59, 59, 999)).toISOString();
+      const response = await fetchAutenticado(
+        `/api/motoristas?inicio=${encodeURIComponent(inicioIso)}&fim=${encodeURIComponent(fimIso)}`
+      );
+      const json = await response.json();
+
+      if (json.sucesso) {
+        setMotoristas(json.dados);
+        setError(null);
+      } else {
+        setError(json.erro || 'Erro ao buscar motoristas');
+      }
+    } catch (erro) {
+      setError('Erro ao carregar dashboard');
+      console.error(erro);
+    }
+  }
+
+  async function exportarExcel() {
+    setExportando(true);
+    try {
+      const inicioIso = new Date(periodoInicio).toISOString();
+      const fimIso = new Date(new Date(periodoFim).setHours(23, 59, 59, 999)).toISOString();
+      const params = new URLSearchParams({ inicio: inicioIso, fim: fimIso });
+      if (busca.trim()) params.set('busca', busca.trim());
+      const response = await fetchAutenticado(`/api/motoristas/exportar?${params.toString()}`);
+      if (!response.ok) throw new Error('Falha ao gerar exportação');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `motoristas_conducao_economica_${periodoInicio.toISOString().slice(0, 10)}_a_${periodoFim.toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (erro) {
+      console.error(erro);
+      alert('Erro ao exportar. Tente novamente.');
+    } finally {
+      setExportando(false);
+    }
+  }
 
   if (loading) {
     return <div style={{ padding: '20px' }}>Carregando...</div>;
@@ -87,19 +146,25 @@ export default function Dashboard() {
         </div>
 
         <div className="wrap">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
             <div>
               <h1 style={{ fontSize: 22 }}>Motoristas</h1>
               <p className="sub" style={{ fontSize: 12.5, marginTop: 4 }}>
-                {motoristas.length} motorista(s) cadastrado(s) · condução econômica
+                {motoristas.length} motorista(s) cadastrado(s) · condução econômica · {filtrados.length} exibido(s) no período
               </p>
             </div>
-            <input
-              placeholder="Buscar por nome ou placa…"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              style={{ maxWidth: 260 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <DateRangePicker inicio={periodoInicio} fim={periodoFim} onChange={(i, f) => { setPeriodoInicio(i); setPeriodoFim(f); }} />
+              <input
+                placeholder="Buscar por nome ou placa…"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                style={{ maxWidth: 240 }}
+              />
+              <button className="btn sm" onClick={exportarExcel} disabled={exportando}>
+                {exportando ? 'Exportando…' : '📊 Exportar Excel'}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -123,10 +188,12 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map((motorista) => (
+                {filtrados.map((motorista) => {
+                  const corFaixa = corParaFaixa(motorista.nota_geral_faixa);
+                  return (
                   <tr
                     key={motorista.id}
-                    onClick={() => router.push(`/motorista/${motorista.id}`)}
+                    onClick={() => router.push(`/motorista/${motorista.id}?inicio=${periodoInicio.toISOString().slice(0, 10)}&fim=${periodoFim.toISOString().slice(0, 10)}`)}
                     style={{ cursor: 'pointer' }}
                   >
                     <td style={{ padding: '12px 16px' }}>
@@ -145,8 +212,8 @@ export default function Dashboard() {
                     <td className="n">{formatarKm(motorista.km_rodado)}</td>
                     <td>
                       {motorista.nota_geral !== null ? (
-                        <span className="pill" style={{ background: 'var(--pista-fx)', color: 'var(--pista)' }}>
-                          {motorista.nota_geral.toFixed(0)} · {motorista.nota_geral_faixa || ''}
+                        <span className="pill" style={{ background: `${corFaixa}22`, color: corFaixa }} title={motorista.nota_geral_cobertura_pct != null ? `Cobertura: ${motorista.nota_geral_cobertura_pct.toFixed(1)}%` : undefined}>
+                          {motorista.nota_geral.toFixed(0)} · {motorista.nota_geral_faixa || '—'}
                         </span>
                       ) : (
                         <span className="pill" style={{ background: 'var(--line)', color: 'var(--mute)' }}>
@@ -163,7 +230,8 @@ export default function Dashboard() {
                     </td>
                     <td className="num" style={{ color: 'var(--sinal)' }}>Ver detalhes →</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             </div>
