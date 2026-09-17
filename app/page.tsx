@@ -14,6 +14,14 @@ interface Motorista {
   cpf: string | null;
   ativo: boolean;
   placa: string | null;
+  km_rodado: number | null;
+  nota_geral: number | null;
+  nota_geral_faixa: string | null;
+}
+
+function formatarKm(km: number | null): string {
+  if (km === null || km === undefined) return '—';
+  return `${km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 }
 
 export default function Dashboard() {
@@ -108,6 +116,8 @@ export default function Dashboard() {
                   <th style={{ padding: '12px 16px' }}>Motorista</th>
                   <th>Placa</th>
                   <th>Matrícula</th>
+                  <th>KM Rodado</th>
+                  <th>Nota Geral</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -132,6 +142,18 @@ export default function Dashboard() {
                     </td>
                     <td className="n">{motorista.placa || '—'}</td>
                     <td className="n">{motorista.matricula || '—'}</td>
+                    <td className="n">{formatarKm(motorista.km_rodado)}</td>
+                    <td>
+                      {motorista.nota_geral !== null ? (
+                        <span className="pill" style={{ background: 'var(--pista-fx)', color: 'var(--pista)' }}>
+                          {motorista.nota_geral.toFixed(0)} · {motorista.nota_geral_faixa || ''}
+                        </span>
+                      ) : (
+                        <span className="pill" style={{ background: 'var(--line)', color: 'var(--mute)' }}>
+                          Sem apuração
+                        </span>
+                      )}
+                    </td>
                     <td>
                       {motorista.ativo ? (
                         <span className="pill" style={{ background: 'var(--pista-fx)', color: 'var(--pista)' }}>Ativo</span>
