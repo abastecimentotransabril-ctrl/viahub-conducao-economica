@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { fetchAutenticado } from '@/lib/fetch-autenticado';
-import { classificarPressao } from '@/lib/motor-apuracao';
+import { classificarPressao, corParaFaixa } from '@/lib/motor-apuracao';
 import DateRangePicker from '@/app/components/DateRangePicker';
 import MotoristaSelector from '@/app/components/MotoristaSelector';
 import Sidebar from '@/app/components/Sidebar';
@@ -50,6 +50,14 @@ interface DetalheHora {
   velocidadeMedia: number | null;
 }
 
+interface DetalheDia {
+  dia: string;
+  qtdLeituras: number;
+  primeiraLeitura: string | null;
+  ultimaLeitura: string | null;
+  resultado: ResultadoApi;
+}
+
 interface DetalheData {
   motorista: { id: string; nome: string; cpf: string | null; matricula: string | null; ativo: boolean };
   veiculo: { placa: string; modelo_equipamento: string; capacidade: string } | null;
@@ -67,6 +75,7 @@ interface DetalheData {
   resultadoPeriodo: ResultadoPeriodo | null;
   pontosTrajeto: PontoTrajeto[];
   detalhamentoPorHora: DetalheHora[];
+  detalhamentoPorDia: DetalheDia[];
   ranking: Array<{ placa: string; nome: string | null; nota: number | null; faixa: string | null }>;
   atendimentos: Array<{ id: string; resumo: string; resultado: string; indicador_mnemonico: string | null; criado_em: string }>;
   papelUsuario: string;
@@ -130,7 +139,7 @@ export default function MotoristaDetalhe() {
     }
   }
 
-  async function exportarCsv() {
+  async function exportarExcel() {
     setExportando(true);
     setExportarAberto(false);
     try {
@@ -144,7 +153,7 @@ export default function MotoristaDetalhe() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `conducao-economica-${motoristaId}.csv`;
+      a.download = `conducao-economica-${motoristaId}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -318,7 +327,7 @@ export default function MotoristaDetalhe() {
             </button>
             {exportarAberto && (
               <div className="export-menu">
-                <button onClick={exportarCsv}>📊 Exportar Excel (.csv)</button>
+                <button onClick={exportarExcel}>📊 Exportar Excel (.xlsx)</button>
                 <button onClick={() => { setExportarAberto(false); window.print(); }}>🖨️ Imprimir / PDF</button>
               </div>
             )}
@@ -750,6 +759,60 @@ export default function MotoristaDetalhe() {
                     <div><div className="i">Evento no pacote</div><div className="o" style={{ fontSize: 12, fontFamily: 'var(--sans)' }}>{leituraDetalheAtual.leitura.eventoBruto || '—'}</div></div>
                   </div>
                 ) : <p className="sub" style={{ fontSize: 12.5 }}>Selecione uma leitura na lista ao lado.</p>}
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <h3>📅 DETALHAMENTO DIA A DIA POR CRITÉRIO <span className="tag">{new Date(dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(dataFim + 'T00:00:00').toLocaleDateString('pt-BR')}</span></h3>
+                {dados.detalhamentoPorDia.length === 0 ? (
+                  <p className="sub" style={{ fontSize: 12.5 }}>Nenhuma leitura real no período selecionado para detalhar por dia.</p>
+                ) : (
+                  <>
+                    <div className="tbox">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Dia</th>
+                            <th className="num">Leituras</th>
+                            <th className="num">Nota do dia</th>
+                            {dados.indicadores.filter((i) => i.tipo === 'pontua' && i.campo_fonte).map((ind) => (
+                              <th key={ind.mnemonico} className="num" title={ind.nome}>{ind.nome}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dados.detalhamentoPorDia.map((d) => (
+                            <tr key={d.dia}>
+                              <td className="n">{new Date(d.dia + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</td>
+                              <td className="num n">{d.qtdLeituras}</td>
+                              <td className="num n">
+                                {d.resultado.nota_final != null ? (
+                                  <span className="pill" style={{ background: `${corParaFaixa(d.resultado.faixa_rotulo)}22`, color: corParaFaixa(d.resultado.faixa_rotulo) }}>
+                                    {nf(d.resultado.nota_final, 1)} · {d.resultado.faixa_rotulo || '—'}
+                                  </span>
+                                ) : (
+                                  <span className="pill" style={{ background: 'var(--line)', color: 'var(--mute)' }}>
+                                    {d.resultado.motivo_inelegibilidade ? 'Cobertura baixa' : 'Sem dado'}
+                                  </span>
+                                )}
+                              </td>
+                              {dados.indicadores.filter((i) => i.tipo === 'pontua' && i.campo_fonte).map((ind) => {
+                                const item = d.resultado.detalhe.find((x) => x.indicador === ind.mnemonico);
+                                return (
+                                  <td key={ind.mnemonico} className="num n" style={{ color: corBanda(item?.nota ?? null), fontWeight: 500 }}>
+                                    {item?.entrou ? nf(item.nota, 0) : '—'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mute" style={{ fontSize: 11, marginTop: 10 }}>
+                      Nota calculada com a mesma metodologia do período inteiro (média ponderada pelo tempo entre leituras, capada em 15 min), aplicada dia a dia. "—" significa que aquele critério não teve dado suficiente naquele dia especificamente.
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>

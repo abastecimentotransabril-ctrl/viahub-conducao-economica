@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
 import { getAuthenticatedUser } from '@/lib/auth-helper';
 import { calcularNotaFinal, ResultadoApuracao } from '@/lib/motor-apuracao';
+import { detalharPorDia } from '@/lib/agregacao-diaria';
 
 export const dynamic = 'force-dynamic';
 
@@ -246,6 +247,18 @@ export async function GET(
       ranking.sort((a, b) => (b.nota || 0) - (a.nota || 0));
     }
 
+    // Detalhamento dia a dia: nota e composição por critério para cada dia
+    // com leitura no período selecionado (mesma metodologia do período
+    // inteiro, aplicada dia a dia).
+    const detalhamentoPorDia = await detalharPorDia(
+      resolvedParams.id,
+      dataInicio,
+      dataFim,
+      indicadoresArr,
+      faixasNotaArr.map((f: any) => ({ nota_minima: f.nota_minima, rotulo: f.rotulo })),
+      regras
+    );
+
     let cpf: string | null = null;
     if (usuario.papel === 'rh' || usuario.papel === 'admin_gamificacao') {
       cpf = motorista.cpf;
@@ -279,6 +292,7 @@ export async function GET(
         pontosTrajeto,
         leiturasPeriodoComNota,
         detalhamentoPorHora,
+        detalhamentoPorDia,
         ranking,
         atendimentos: atendimentos || [],
         papelUsuario: usuario.papel,
